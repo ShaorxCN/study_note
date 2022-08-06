@@ -1,0 +1,36 @@
+[workspace]
+
+members = [
+    "closure",
+    "collection",
+    "config",
+    "error",
+    "guess_number",
+    "minigrep",
+    "rectangles",
+    "restaurant",
+    "test_part",
+    "trait_life",
+]
+
+
+工作空间的配置文件 具体例子未附
+工作空间在根目录下有一个target目录用来存放所有成员的编译产出物，相对应地，adder包也就没有了自己独立的target目录。
+即使我们进入adder目录中运行cargo build，编译产出物依然会输出到add/target而不是add/adder/target中。
+Cargo之所以会将不同的target目录集中到一处是因为工作空间中的包往往是互相依赖的。
+如果每个包都有自己的target目录，那么它们就不得不在执行各自的构建过程中反复编译工作空间下的其余包。
+而通过共享一个target目录，不同的包就可以避免这些不必要的重复编译过程。
+
+由于Cargo不会主动去假设工作空间中的包会彼此依赖，所以我们必须要显式地指明包与包之间的依赖关系。
+接下来，让我们在adder包中使用来自add-one包的add_one函数。
+打开adder/src/main.rs文件，并在文件顶部使用use语句将新的add-one包引入作用域。
+随后修改main函数来调用add_one函数
+
+cargo test/run/build -p xxx 
+指定某个包做run或者test
+
+
+cargo install ripgrep
+下载指定二进制包到 cargo/bin下 其实应该是CARGO_HOME/bin
+
+当然 还有cargo uninstall ripgrep
