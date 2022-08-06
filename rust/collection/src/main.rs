@@ -118,6 +118,7 @@ fn hash_test() {
     // let teams = vec![1, 2];
     // let is = vec![10, 100];
 
+    // zip 返回()元组
     //  scores = teams.iter().zip(is.iter()).collect(); // 迭代器返回的是引用 所以和直接插入是不一样的
     println!("{:?}", scores);
 

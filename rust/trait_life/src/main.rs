@@ -120,7 +120,7 @@ struct Point<T, M> {
     y: M,
 }
 
-// impl后跟随<T,M>代表未泛型实现 编译器会知道T,M 是泛型标记而不是具体类型
+// impl后跟随<T,M>代表为泛型实现 编译器会知道T,M 是泛型标记而不是具体类型
 // impl Potin(i32,i32) 则代表i32的实现
 impl<T, M> Point<T, M> {
     fn x(&self) -> &T {
@@ -159,7 +159,7 @@ pub fn notify(item: impl Summary, _item2: impl Summary) {
 
 // pub fn notify2<T: Summary + Display>(item: T) {}
 
-// 如果需要多个trait 那么可以使用wher从句
+// 如果需要多个trait 那么可以使用where从句
 // fn some_function<T, U>(t: T, u: U) -> impl Summary
 // where
 //     T: Display + Clone + Summary,
@@ -189,7 +189,7 @@ pub fn notify(item: impl Summary, _item2: impl Summary) {
 //     // }
 // }
 
-// 声明周期需要卸载泛型前面
+// 声明周期需要写在泛型前面
 struct test_mul<'a, 'b, T, M> {
     x: T,
     y: M,
