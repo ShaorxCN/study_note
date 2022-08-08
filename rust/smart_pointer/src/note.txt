@@ -11,3 +11,4 @@ Drop保证所有权
 Box<T> 就是数据放在堆上 引用放在栈上？或者做trait的引用
 
 Rc<T>  计数器 类似不可变引用  创建时时1 对象rc::clone(&x)+1 clone对象离开 自动drop-1
+[tip：第一个参数名self &self &mut self 才是方法  Self 类似this:Self则是关联函数]

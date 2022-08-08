@@ -40,7 +40,8 @@ fn main() {
     let testpp = trait_life::TestP {
         content: String::from("horse_ebooks"),
     };
-
+    // 作为方法是可以::调用的  但是不会自动解引用啥的
+    println!("{}", trait_life::TestP::summarize(&testpp));
     println!("{}", testpp.summarize());
 
     src_a::aecho();
