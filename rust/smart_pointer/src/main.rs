@@ -1,6 +1,9 @@
 use crate::List::{Cons, Nil};
 use std::ops::Deref;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 enum List {
     // 如果直接是(i32,List) enum在检查大小时寻找最大 发现是一个递归  无法确定大小 报错
     Cons(i32, Box<List>),
@@ -135,4 +138,58 @@ fn circle() {
     println!("a rc count after changing a = {}", Rc::strong_count(&a));
     // 这里循环引用了
     // println!("a next item = {:?}", a.tail());
+}
+
+#[derive(Debug)]
+struct Node {
+    value: i32,
+    children: RefCell<Vec<Rc<Node>>>,
+    parent: RefCell<Weak<Node>>,
+}
+
+#[test]
+fn weak_t_test() {
+    let leaf = Rc::new(Node {
+        value: 3,
+        children: RefCell::new(vec![]),
+        parent: RefCell::new(Weak::new()),
+    });
+    // 1,0
+    println!(
+        "leaf strong = {}, weak = {}",
+        Rc::strong_count(&leaf),
+        Rc::weak_count(&leaf)
+    );
+    println!("leaf parent = {:?}", leaf.parent.borrow().upgrade());
+    {
+        let branch = Rc::new(Node {
+            value: 5,
+            children: RefCell::new(vec![Rc::clone(&leaf)]),
+            parent: RefCell::new(Weak::new()),
+        });
+
+        // 这样不会产生类似循环引用了
+        *leaf.parent.borrow_mut() = Rc::downgrade(&branch);
+        // 2, 0
+        println!(
+            "leaf strong = {}, weak = {}",
+            Rc::strong_count(&leaf),
+            Rc::weak_count(&leaf)
+        );
+
+        // 1,1
+        println!(
+            "branch strong = {}, weak = {}",
+            Rc::strong_count(&branch),
+            Rc::weak_count(&branch)
+        );
+    }
+    println!("leaf parent = {:?}", leaf.parent.borrow().upgrade());
+
+    // 1, 0
+    println!(
+        "leaf strong = {}, weak = {}",
+        Rc::strong_count(&leaf),
+        Rc::weak_count(&leaf)
+    );
 }
