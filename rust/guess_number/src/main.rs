@@ -88,6 +88,7 @@ fn loop_test() {
         println!("the value is {}", element);
     }
 
+    // 1 2 3
     for number in (1..4).rev() {
         println!("{}", number);
     }

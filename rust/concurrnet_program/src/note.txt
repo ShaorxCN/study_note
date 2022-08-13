@@ -1,0 +1,47 @@
+rust 尽可能减少运行时
+
+提供和系统线程1:1的线程模型
+
+• 使用通道在线程间发送消息的消息传递式并发。
+• 允许多个线程访问同一片数据的共享状态式并发。
+• Sync trait与Send trait，能够将Rust的并发保证从标准库中提供的类型扩展至用户自定义类型。
+
+线程中运行代码使用闭包和thread::spawn()
+因为新线程和主线程不可控的原因 闭包无法直接使用外部数据  通过move【但是也是因为所有权问题 move了那就是说发送后
+其他域是没法使用发送值得 所有还有第二点得 类似共享内存得  共享状态得并发】
+
+mpsc::channle()创建通信通道
+mpsc: multipe producer single consumer 
+
+let (tx, rx) = mpsc::channel();
+let tx1 = mpsc::Sender::clone(&tx);
+
+mpsc::Sender::clone()来实现multiple producer
+
+共享内存 Mutex::new(xx)
+尝试lock返回智能指针 可变引用 然后离开时自动unlock
+当然也可以手动Mutex::unlock(xx)
+
+Arc Rc得原子操作版本 支持多线程之前得clone计数
+
+这里发现Arc::new(Mutx::new()) 和上节得Rc::new(RefCell::new())类似
+
+Mutx自己保证了同一时间只有一个类似RefCell得borrow_mut 这里自然是lock
+这样符合使用又是多重所有权下得可变引用
+
+Send trait实现多线程间得所有权转移 比如Arc相比于Rc
+
+Sync trait 允许多线程同时访问
+只有实现了Sync trait的类型才可以安全地被多个线程引用。
+换句话说，对于任何类型T，如果&T（也就是T的引用）满足约束Send，那么T就是满足Sync的。
+这意味着T的引用能够被安全地传递至另外的线程中。
+与Send类似，所有原生类型都满足Sync约束，
+而完全由满足Sync的类型组成的复合类型也都会被自动识别为满足Sync的类型。比如Mutex 但是RefCell是不满足得
+
+
+当某个类型完全由实现了Send与Sync的类型组成时，它就会自动实现Send与Sync。因此，我们并不需要手动地为此种类型实现相关trait。
+作为标签trait，Send与Sync甚至没有任何可供实现的方法。它们仅仅被用来强化与并发相关的不可变性。
+
+实际代码:
+pub unsafe auto trait Send { }
+
