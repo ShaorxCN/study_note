@@ -190,7 +190,7 @@ pub fn notify(item: impl Summary, _item2: impl Summary) {
 //     // }
 // }
 
-// 声明周期需要写在泛型前面
+// 生命周期需要写在泛型前面
 struct test_mul<'a, 'b, T, M> {
     x: T,
     y: M,

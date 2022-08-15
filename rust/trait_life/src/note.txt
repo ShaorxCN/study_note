@@ -1,0 +1,13 @@
+impl xx for yy{
+    fn ddd(&self){}
+}
+
+impl yy{
+    fn ddd(&self){}
+}
+
+可以同时存在 直接调用则是下面得
+
+作为泛型得使用则是上面得 其实也是:: 和.都能调用
+
+实现trait 一定要impl for 毕竟可以同函数签名
