@@ -1,0 +1,73 @@
+可失败模式和不可失败模式 
+
+例如 let for 函数参数只接收不可失败 
+let Some(x) = None
+编译报错
+
+可失败模式 if let  ,while let   只接收可失败得 不然报错
+
+if let x= 5 报错
+
+模式语法
+
+1. 匹配字面量
+
+let x = 1;
+
+match x{
+     1 => println!("one"),
+    2 => println!("two"),
+    3 => println!("three"),
+    _ => println!("anything"),
+}
+
+2. 匹配命名变量 
+见 
+test_pattern_named()
+
+3.多重模式
+
+见test_pattern_multiple
+
+3. ..=匹配区间
+见 test_pattern_range()
+
+4. 结构模式来分解值
+分解结构体 枚举  元组 或者引用
+
+5. 忽略模式中得值
+
+ foo();
+
+
+6. ref ,mut ref 代表引用 避免move 所有权
+
+7.guard 守卫条件
+就是match分支后if得条件语句
+在匹配得同时还得if条件成立才最终匹配
+可以解决match域同名变量覆盖得问题
+外部x= Some(5);y=10;
+match x{
+Some(y) 改成 Some(n) if n==y==>{xxxxx}
+}
+
+这样相当于精确匹配Some(y)即Some(10)
+
+4|5|6 if y 匹配模式 4|5|6 并且y=true才行
+
+8 @绑定
+ xxx @xx 匹配xx条件 并绑定到xx上
+
+
+ex:
+
+fn age()->u32{
+    15
+}
+
+
+match age(){
+    0 =>println!("skip"),
+    n@1..20=>println!("{}",n), // 15
+    n=>=>println!("{}",n)
+}
