@@ -198,3 +198,5 @@ fn test_newtype_trait() {
     // 报错
     // println!("w = {}", w.0)
 }
+
+fn test_newtype() {}
