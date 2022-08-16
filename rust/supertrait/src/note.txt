@@ -1,0 +1,124 @@
+• 不安全Rust：舍弃Rust的某些安全保障并负责手动维护相关规则。
+• 高级trait：关联类型、默认类型参数、完全限定语法（fully qualified syntax）、超trait（supertrait），以及与trait相关的newtype模式。
+• 高级类型：更多关于newtype模式的内容、类型别名、never类型和动态大小类型。
+• 高级函数和闭包：函数指针与返回闭包。
+• 宏：在编译期生成更多代码的方法。
+
+
+1.unsafe 关键字切换到不安全模式 标记后得代码块使用不安全代码
+{
+    1.1 解引用裸指针  *const T/*mut T 不可变指针和可变指针 *不是代表解引用操作 是类型的一部分 不可变代表无法对解引用后的指针赋值
+    1.2 调用不安全的函数和方法  unsafe代码块中  因为本身就是不安全的 unsafe内的 所以函数内不需要额外的unsafe块
+        // 标准库的例子
+         pub fn split_at_mut(&mut self, mid: usize) -> (&mut [T], &mut [T]) {
+         assert!(mid <= self.len());
+         // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
+         // fulfills the requirements of `from_raw_parts_mut`.
+         unsafe { self.split_at_mut_unchecked(mid) }
+    }
+    1.3 访问或者修改可变的静态变量
+        // 静态变量 不可变静态变量拥有固定地址 命名大写蛇模式
+        // 读写可变静态变量都是不安全的 都需要在unsafe代码块中
+    1.4 实现不安全的trait
+        // unsafe trait Foo {}
+        // unsafe impl Foo for i32 {}
+
+}
+
+extern 调用外部代码 FFI Foreign Function Interface
+
+2.高级trait
+    2.1关联类型
+        类似 Iterator中包含一个Item这样迭代返回的都是这个Item类型
+        pub trait Iterator {
+            type Item;
+
+            fn next(&mut self) -> Option<Self::Item>;
+        }
+
+        为自己的类型实现Iterator
+        impl Iterator for Counter {
+        type Item = u32;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.count += 1;
+            if self.count < 6 {
+                Some(self.count)
+            } else {
+                None
+            }
+        }
+
+        为啥不用泛型？因为这样使用泛型 那么就会出现贼多的impl <具体类型> for xxx
+        TODO:
+    2.2 默认泛型参数和运算符重载
+        <PlaceholderType=ConcreteType>
+        // 这里RHS就是一种默认参数类型  Right-Hanldeside
+        // 如果实现的时候没有指定RHS那么默认就是Self
+        trait Add<RHS=Self>{
+            type Output;
+            fn add(self, rhs: RHS) -> Self::Output;
+        }
+
+        这里默认就是 impl Add<Point>for Point
+        impl Add for Point {...}
+
+        见 test_reload_add
+
+    2.3 消除歧义的完全限定语法:调用相同名称的方法
+        这个之前遇到过 就是多个trait 甚至 trait和关联方法/函数本身名称一样
+        比如函数可以.调用 也可以::调用
+
+        ::调用可以消除歧义
+
+        类似一个结构体X 实现了A,B trait的 m,m方法(两个同名) 甚至自己也有个m方法 签名也一样 比如参数都是&self
+        一般都是实例 x.m()就行 但是这里就容易歧义
+        在未指定 比如作为泛型参数传入的时候 调用就是调用的自己的函数
+        不然可以 A::m(&x) /B::m(&x) 比如之前遇到的clone
+
+        如果是非self的关联函数和trait冲突
+        <X as A/b>::method_name
+        见 test_ambiguity
+    2.4 trait中附带另外一个trait的超trait
+        trait: A,B 使用A需要依赖于B 那么B就是A的超trait
+        语法
+        trait A:B{
+
+        }
+
+        见 test_supertrait
+    2.5 利用新类型来绕过trait孤儿规则限制(trait和需要实现的类型 必须又一个在当前包) 但是感觉不对 那个实现的其实还是新类型
+        见 test_newtype_trait
+
+    2.6 高级类型
+        2.6.1 newtype 其实还是有用的 比如通过包装来暴露一些私有类型的特殊的api 隐藏内部实现
+        2.6.2 类型别名
+              type Kilometers = i32;
+              可以减少一些重复代码 比如
+              type Thunk = Box<dyn Fn() + Send + 'static>;
+              后面再做形参的时候可以Thunk代替后面的一堆
+
+
+            ========== type Result<T> = Result<T, std::io::Error> ==============
+            这个注意下  这个相当于自动填充了  Result<T> 当类型进去后自动变为 Result<T,std::io::Error>
+            // Result<usize> 就是 Result<uszie,std::io::Error>
+            当然实际是
+            ResultM<usize,Error> 因为这个定义就是在io包
+    
+    2.7 Never类型 永远不返回
+        fn bar()->!{
+
+        }
+        这样的函数叫做发散函数
+        其实！类型是可以强制转换为任何类型
+        这样就出现
+        let guess = match xx{
+            aaa=>1,
+            bbb=continue,
+        }
+        因为let guess 确定不可失败模式 只能是一个类型 所以这里aaa返回1 那么bbb也必须是数字类型 但是continue是！
+    
+    
+
+
+    
