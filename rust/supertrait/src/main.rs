@@ -1,11 +1,13 @@
+use hello_macro_derive::HelloMacro; // 导入宏
+use router_macro::{make_hello, route}; // 导入宏
 use std::{fmt, ops::Add, slice};
-use supertrait::*;
+use supertrait::*; // 这里因为* 其实也导入了HelloMacro的trait
 
 // 静态变量 不可变静态变量拥有固定地址 命名大写蛇模式
 static HELLO_WORLD: &str = "Hello,world";
 // 读写可变静态变量都是不安全的 都需要在unsafe代码块中
 static mut COUNTER: u32 = 0;
-
+make_hello!(evan);
 fn main() {
     test_raw_pointer();
     test_dangerous();
@@ -20,6 +22,13 @@ fn main() {
     test_ambiguity();
     test_supertrait();
     test_newtype_trait();
+    println!("{}", do_twice(add_one, 2));
+    test_fn_pointer();
+    test_proc_macro();
+    index();
+
+    // make_hello!(evan)生成
+    hello_evan();
 }
 
 fn test_raw_pointer() {
@@ -199,4 +208,71 @@ fn test_newtype_trait() {
     // println!("w = {}", w.0)
 }
 
-fn test_newtype() {}
+// fn test_DST() {
+//     let s1: str = "Hello there!";
+//     let s2: str = "How's it going?";
+// }
+
+fn add_one(x: i32) -> i32 {
+    x + 1
+}
+
+fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
+    f(arg) + f(arg)
+}
+
+#[derive(Debug)]
+enum Status {
+    Value(u32),
+    Stop,
+}
+
+fn test_fn_pointer() {
+    let list_of_numbers = vec![1, 2, 3];
+    // let list_of_strings: Vec<String> = list_of_numbers.iter().map(|i| i.to_string()).collect();
+    let list_of_strings: Vec<String> = list_of_numbers.iter().map(ToString::to_string).collect();
+    println!("{:?}", list_of_numbers);
+    // 0u32指定u32 否则默认i32?
+    let list_of_statuses: Vec<Status> = (0u32..20).map(Status::Value).collect();
+    println!("{:?}", list_of_statuses);
+}
+
+// export 表示引入包即可用
+// $()中代表匹配模式 匹配到的内容将被替换
+// 这expr 表示任何都可以匹配 然后命名为$x
+// ,表示匹配代码后面可能有逗号分隔符
+// *表示可以匹配0个或者多个之前的代码
+// 看内容 先创建一个temp_vec
+// $()*为每个匹配到的$()生成执行$()*中的代码 push
+#[macro_export]
+macro_rules! vec {
+    ($( $x:expr ),* ) => {
+           {
+               let mut temp_vec = Vec::new();
+            $(
+                 temp_vec.push($x);
+               )*
+            temp_vec
+           }
+       };
+}
+
+// 用vec![1,2,3]举例 等价于
+// {
+//     let mut temp_vec = Vec::new();
+//     temp_vec.push(1);
+//     temp_vec.push(2);
+//     temp_vec.push(3);
+//     temp_vec
+// }
+#[derive(HelloMacro)]
+struct Pancakes;
+
+fn test_proc_macro() {
+    Pancakes::hello_macro();
+}
+
+#[route(GET, "/")]
+fn index() {
+    println!("this is a route fn");
+}

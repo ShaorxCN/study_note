@@ -1,0 +1,9 @@
+替换镜像
+.cargo 下创建config.toml文件
+
+然后添加以下内容(不同镜像站看对应的帮助文档)
+[source.crates-io]
+replace-with = 'ustc'
+
+[source.ustc]
+registry = "git://mirrors.ustc.edu.cn/crates.io-index"

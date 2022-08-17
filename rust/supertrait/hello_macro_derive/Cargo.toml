@@ -1,10 +1,11 @@
 [package]
-name = "supertrait"
+name = "hello_macro_derive"
 version = "0.1.0"
 edition = "2021"
-
+[lib]
+proc-macro = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hello_macro_derive = { path = "./hello_macro_derive" }
-router_macro = { path = "./router_macro" }
+syn = "0.14.4"
+quote = "0.6.3"

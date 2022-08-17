@@ -117,8 +117,56 @@ extern 调用外部代码 FFI Foreign Function Interface
             bbb=continue,
         }
         因为let guess 确定不可失败模式 只能是一个类型 所以这里aaa返回1 那么bbb也必须是数字类型 但是continue是！
-    
-    
+
+    2.8 动态大小类型和Sized trait
+        例如 str 因为对于str本身 无法确定他的大小 毕竟有长有短 但是&str 是指针和长度 就是编译期间可以确定 指针+len 2个 usize
+        当然之前说的动态类型也是可以的Box<str>也是
+        为了处理动态大小类型，Rust还提供了一个特殊的Sized trait来确定一个类型的大小在编译时是否可知。
+        编译时可计算出大小的类型会自动实现这一trait。另外，Rust还会为每一个泛型函数隐式地添加Sized约束。
+        也就是说，下面定义的泛型函数：
+        fn generic<T>(t:T){
+
+        }
+        等价于
+        fn generic<T:Sized>(t:T){}
+
+        为了接触Sized限制 只能用在Sized上 表示T可能不是Sized的 并且形参类型改为了&T 这样编译ok 还是哪个 泛型需要可替换 可Sized。
+        fn generic<T:?Sized>(t:&T){}
+    2.9 高级函数和闭包 
+        函数指针 fn 和闭包的Fn区分 Function pointers, like fn(usize) -> bool是一个类型 不是trait 函数指针实现了全部三种闭包trait Fn FnOnce FnMut
+        所以可以将函数指针作为闭包形参的函数
+        do_twice
+        同样 闭包没有具体大小 没有实现Sized 所以返回闭包函数啥的还是需要Box<dyn Fn(i32)->i32>
+
+3.宏 macro
+    术语宏（macro）其实是Rust中的某一组相关功能的集合称谓，其中包括使用macro_rules! 构造的声明宏（declarative macro）及另外3种过程宏（procedural macro）：
+    • 用于结构体或枚举的自定义#[derive]宏，它可以指定随derive属性自动添加的代码。
+    • 用于为任意条目添加自定义属性的属性宏。
+    • 看起来类似于函数的函数宏，它可以接收并处理一段标记（token）序列。
+
+    宏处理可变参数 编译在解释代码前展开宏
+    这样就可以实现trait
+    vec!举例
+    macro_rules 声明宏
+    macro_rules！macro_name:
+    macro_rules! vec
+
+    基于属性创建代码的过程宏
+        过程宏会接收并操作输入的Rust代码，并生成另外一些Rust代码作为结果，这与声明宏根据模式匹配来替换代码的行为有所不同。
+        虽然过程宏存在3种不同的类型（自定义派生宏、属性宏及函数宏），但它们都具有非常类似的工作机制。
+        事实上，根据这个说法，过程宏放入独立包的原因在于它必须先被编译后才能使用，
+        如果过程宏和使用它的代码在一个包，就必须先单独对过程宏的代码进行编译，
+        然后再对我们的代码进行编译，但悲剧的是 Rust 的编译单元是包，因此你无法做到这一点。
+
+        自定义派生宏 一个自定义Derive宏
+        见 hello_macro_derive
+
+        属性宏
+        见router_macro
+
+        函数宏
+        见royuter_macro make_hello
+
 
 
     

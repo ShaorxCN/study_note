@@ -29,22 +29,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "router_macro"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
-name = "supertrait"
-version = "0.1.0"
-dependencies = [
- "hello_macro_derive",
- "router_macro",
-]
-
-[[package]]
 name = "syn"
 version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -10,3 +10,7 @@ impl Add<Meters> for Millimeters {
         Millimeters(self.0 + (other.0 * 1000))
     }
 }
+
+pub trait HelloMacro {
+    fn hello_macro();
+}
