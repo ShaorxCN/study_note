@@ -7,3 +7,12 @@ replace-with = 'ustc'
 
 [source.ustc]
 registry = "git://mirrors.ustc.edu.cn/crates.io-index"
+
+可以
+.git/hooks/pre-commit
+
+cargo fmt
+exec cargo clippy -- -D warnings
+
+chmod +x .git/hooks/pre-commit
+这样自动格式化以及编译器检查建议
