@@ -16,3 +16,18 @@ exec cargo clippy -- -D warnings
 
 chmod +x .git/hooks/pre-commit
 这样自动格式化以及编译器检查建议
+
+
+// 配置好本身对应的密钥后 依赖里这么写可以引用私有库的项目
+tag可以是branch
+github同理
+[dependencies]
+common-utils = { git = "ssh://git@xxx.com/common/common-utils.git", tag = "v0.0.1" }
+regex = { git = "https://github.com/rust-lang/regex", branch = "next" }
+hello_utils = { path = "./hello_utils" } // 同项目下 也就是和src同级
+
+
+vscode debug跳转源码问题
+
+preference 里搜debug 在rust里编辑sourcefilemap id是报错提示的那个id替换就行 后面跟自己实际安装的地址 xxx\\rust里面就有library\\core一类的
+"\\rustc\\<id>": "xxxxx\\rust"
