@@ -170,3 +170,20 @@ extern 调用外部代码 FFI Foreign Function Interface
 
 
     
+
+tip:
+
+trait A{
+    fn a(&self)->String;
+}
+
+trait B{
+    fn b(&self)->i32;
+}
+
+trait C:A+B{
+    fn c(&self);
+}
+
+A和B是C的父 或者说A+B+C的a b c三个组合成了c的trait
+implC要同时impl A+B
