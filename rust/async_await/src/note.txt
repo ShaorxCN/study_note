@@ -14,3 +14,13 @@ IO密集选async CPU密集选线程
 主要是future trait
 
 async 代码块变为future状态
+
+包含这个的类型 就默认变为不是先Unpin
+pub struct PhantomPinned;
+
+use std::marker::PhantomPinned;
+struct Test {
+    a: String,
+    b: *const String,
+    _marker: PhantomPinned,
+}
