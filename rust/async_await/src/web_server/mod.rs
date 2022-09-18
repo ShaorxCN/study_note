@@ -1,12 +1,11 @@
-use async_std::task;
+use async_std::io::{Read, Write};
 use async_std::prelude::*;
-use std::time::Duration;
+use async_std::task;
 use std::fs;
 use std::marker::Unpin;
-use async_std::io::{Read, Write};
+use std::time::Duration;
 
-
-pub async  fn handle_connection(mut stream: impl Read+Write+Unpin) {
+pub async fn handle_connection(mut stream: impl Read + Write + Unpin) {
     let mut buffer = [0; 1024];
 
     stream.read(&mut buffer).await.unwrap();
