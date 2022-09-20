@@ -1,0 +1,3 @@
+virtual box
+
+VBoxManage.exe convertdd xxx.bin/img xxx.vdi
