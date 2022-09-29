@@ -31,3 +31,13 @@ vscode debug跳转源码问题
 
 preference 里搜debug 在rust里编辑sourcefilemap id是报错提示的那个id替换就行 后面跟自己实际安装的地址 xxx\\rust里面就有library\\core一类的
 "\\rustc\\<id>": "xxxxx\\rust"
+
+
+version= stable nightly beta
+rustup install version
+default setting:
+rustup default version
+
+
+dir setting
+rustup override set version
