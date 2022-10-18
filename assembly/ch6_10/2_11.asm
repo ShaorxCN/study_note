@@ -21,11 +21,3 @@ codesg ends
 end start
 
 
-dd申明双字数据结构
-db 8bit
-dw 16bit
-dd  32bit
-
-dup代表重复 配合 db dw dd使用
-
-db 3 dup(0,1,2) 等价于 db 0,1,2,0,1,2,0,1,2

@@ -41,6 +41,14 @@ inc word ptr ds:[0]
 这就是按照一个字单元来
 mov byte ptr ds:[0],1 这就是一个字节  
 
+dd申明双字数据结构
+db 8bit
+dw 16bit
+dd  32bit
+
+dup代表重复 配合 db dw dd使用
+
+db 3 dup(0,1,2) 等价于 db 0,1,2,0,1,2,0,1,2
 
 div除法指令
 被除数默认放在ax或者dx和ax中
@@ -98,3 +106,50 @@ jcxz 标号 等价于 if cx==0 jmp short 标号
 loop 都是短转移
 
 dec 和 inc相反
+
+
+CALL 和 RET指令
+
+都是转移指令
+
+ret 和 retf
+ret 用栈的数据修改ip 时16位 所以是近转移
+retf 用栈的数据修改cs和ip所以是段间转移或者远转移
+
+ret等价于：ip=ss*16+sp  sp=sp+2/ 或者说是 pop ip
+retf等价于: ip=ss*16+sp  sp=sp+2  cs=ss*16+sp  sp=sp+2 / 或者说是pop cs pop ip
+
+call  可以记录之前的位置
+call 标号 = sp=sp-2 ss*16+sp = 16 ip=ip+16位位移 就相当于先push ip在转移 16位位移= 标号地址-call指令后的第一个字节的地址
+call far ptr 标号：相当于 push cs push ip jmp far ptr 标号
+call 16位 reg = push ip jmp 16位reg
+call 内存单元
+call word ptr x： push ip  jmp word ptr 内存单元地址
+call dword ptr x：push cs   push ip  jmp dword ptr 内存单元地址 高位是cs
+比如
+mov sp,10h
+mov ax,0123h
+mov ds:[0],ax
+mov word ptr ds:[2],0
+call dword ptr ds:[0] 执行后cs=0,ip=0123h  
+
+
+
+
+mul 乘法指令
+类似除法  要么俩8位 要么俩16位相乘  如果是8位 一个放在al一个放在其他的8位reg或者某个内存字节单元
+如果是俩16位 一个放在ax 另一个放在16位reg或者双字内存单元
+结果的话 8位的结果默认放在ax 16位的默认高位放在dx 低位在ax
+
+
+mul reg 
+mul 内存单元
+
+mul byte ptr ds:[0]
+
+
+call 和 ret可以实现类似调用子程序的功能
+call 标号将ip入栈 然后执行标号处的代码 然后ret 出栈ip回到原来的位置 这是段内的
+段间的就是call far ptr 或者call内存单元
+
+这是单个参数的 如果是批量数据 可以考虑放内存空间的首地址在bx中 cx中放长度做循环用
