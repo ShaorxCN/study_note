@@ -1,0 +1,79 @@
+汇编程序包含两个部分 伪代码和汇编指令
+
+伪代码就是由编译器来执行 不会被cpu执行
+
+伪指令
+
+xxx segment
+xxx ends
+
+表示定义一个段 标识为xxx
+段名 segment
+    .
+    .
+    .
+段名 ends
+
+
+end代表结束 不是ends!
+
+编译器读取到end就会停止对源文件的编译
+
+assume
+将我们segment 定义的段和某个段寄存器关联起来
+比如ex1.asm中将cs和codesg关联起来
+
+除了上面三个 还有标号 比如codesg 这个段名会被编译连接成一个段的段地址
+
+这两条指令代表程序返回或者说是返回DOS
+mov ax,4c00H 
+int 21H
+
+int 21H代表DOS的中断 然后通过AH的内容调用对应的功能
+4CH  带返回码的结束 AL=进程返回码
+
+连接的作用 
+1 多个源文件分别编译 然后连接生成一个可执行文件。
+2 如果调用某个库的子程序 可以将库文件和自己的目标文件连接生成可执行文件
+3 目标文件中部分内容还无法直接生成可执行文件 所以连接生成
+
+
+command加载程序  找到一段空闲内存
+段地址SA
+然后SA:0 ffH 中间256字节的空间是PSP数据区 用来和程序通信 
+SA:100h开始load程序
+其实段地址是不一样的
+程序区是sa+10:0开始
+
+SA×16+100h=(sa+10h)*16
+
+SA放在ds寄存器中
+
+
+loop指令根据cx判断
+
+执行到loop的时候 
+cx=cx-1
+判断cx的值 不为0则转至标号处执行程序 为0则继续执行
+
+
+assume cs:code
+code segment
+         mov  ax,0ffffh    ;不能字母开头 所以是0ffffh
+         mov  ds,ax
+         mov  bx,6
+         mov  cx,3
+         mov  dx,0
+         mov  al,[bx]
+         mov  ah,0
+    s:   add  dx,ax
+         loop s
+         mov  ax,4c00h
+         int  21h
+code ends
+end
+
+bx可以用来存放偏移量
+
+段前缀
+Mov ax,cs:[bx] cs这种就是段前缀

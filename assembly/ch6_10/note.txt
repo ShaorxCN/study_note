@@ -1,0 +1,100 @@
+dw 声明字型数据  代码里出现的位置和cs中的偏移相对
+
+end xx指定xx为程序入口
+
+多个段见2_3  2_4
+
+and 按位与
+mov al,01100011b
+and al,00111011b
+
+结果 al=00100011b
+
+or 按位或
+mov al,01100011b
+or al,00111011b
+结果 al=01111011b
+
+
+
+[bx+idata]
+等价于 ds*16+(bx+idata)
+
+就是ds偏移bx+idata个内存单元(字节)
+还有其他写法 比如 [5+bx] 等价于5[bx]
+
+bp bx 类似
+si di类似 
+bp bx都可以和si di配合使用
+
+si 和 di不能配合使用
+
+ss:sp  ss:bp默认
+
+处理数据的长度
+有寄存器根据寄存器来
+没有可以通过关键字 X ptr指定
+x可以是word 或者 byte
+
+mov word ptr ds:[0],1 
+inc word ptr ds:[0]
+这就是按照一个字单元来
+mov byte ptr ds:[0],1 这就是一个字节  
+
+
+div除法指令
+被除数默认放在ax或者dx和ax中
+除数如果是8位  被除数则为16位默认放在ax中  al中存放商  ah存放余数
+除数是16位  被除数是32位   dx中存放高16为 ax存放低16位  ax存放商  dx存放余数
+div reg
+div 内存单元
+
+div byte ptr ds:[0]
+那么  al=ax/（ds*16+0）
+      ah=ax%(ds*16+0)
+
+div word ptr ds:[0]
+那么  ax=(dx*10000h+ax)/（ds*16+0）
+      dx=(dx*10000h+ax)(ds*16+0)
+
+可以修改ip或者同时修改cs ip的指令称为转移指令
+jmp ax 段内转移
+jmp x:y 段间转移
+
+段内转移分为：短转移 修改ip 8位
+            长转移 修改ip 16位
+
+
+offset 取得标号的偏移地址
+
+assume cs:codesg
+start:mov ax,offset start ;等价于mov ax,0 start是入口 所以偏移是0
+s:mov ax,offset s;等价于mov ax,3 因为s标号的相对偏移是3
+codesg ends
+
+end start
+
+
+jmp short 标号 代表短转移到某标号处 
+实际机器码是计算位移距离 不是指定处
+
+jmp near prt 标号 段内近转移  16位 就是段内长转移？
+jmp far ptr 标号 远转移  32位 段间转移
+
+jmp reg 这种就是ip=reg 16位 段内长转移
+
+jmp word ptr 内存单元 也是段内转移 16位
+jmp dword ptr 内存单元地址 这就是段间转移了 双字 32位：
+高位置是段地址 低位时偏移地址
+
+mov ax,0123h
+mov ds:[0],ax
+mov word ptr ds:[2],0
+jmp dword ptr ds:[0] ;等价于 cs=0000  ip =0123
+
+jcxz指令 都短转移 自然就是段内的8位转移
+jcxz 标号 等价于 if cx==0 jmp short 标号
+
+loop 都是短转移
+
+dec 和 inc相反
