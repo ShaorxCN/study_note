@@ -1,0 +1,18 @@
+直接定址表
+不但表示内存单元的地址 还表示了内存单元的长度 即此处的单元时一个字单元还是双字单元
+code segment
+    a db 1,2,3,4,5,6,7,8
+    b dw 0
+...
+code ends
+(对比的时codesegment 中 类似 s:xxxx 然后直接同s代表相对的偏移位置 比如offset s啥的)
+此处的a不仅代表开始的位置 还表示每个单元时一个字节
+mov ax,b 等价于 mov ax,cs:[8]
+mov b,2 等价于 mov word ptr cs:[8],2
+inc b 等价于 inc word ptr cs:[8]
+
+mov al,a[si] 等价于 mov al,cs:0[si]
+
+
+也可以在其他段中使用这类标号
+

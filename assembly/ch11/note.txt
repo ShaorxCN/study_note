@@ -1,0 +1,87 @@
+标志寄存器
+
+8086中最后一类寄存器   也是16位
+cf ：carry 最高位的进位或者借位  针对无符号数  cf of 可同时受到影响
+pf : parity 第二位 奇偶校验位 执行相关指令后 结果所有bit中1的个数是否为偶数 如果是则pf=1 不是则pf=0 （0是偶数）
+af
+zf :zero flag 第六位 表示执行相关指令后结果是否位0 如果是0 则zf=1 否则位0
+sf :symbol 符号标识位 表示指令结果是否为负数  是则sf=1 否则为0
+tf ：调试标志位 等于1时处理器每次只执行一条指令 也就是单步执行
+if : 中断允许标志位 为1表示能响应外部中断 为0则屏蔽外部中断  sti if=1 cli if=0
+df : direction flag 控制串处理指令中 每次操作后si di的增减  df=0 si，di递增 否则递减
+of : overflow 溢出  针对有符号数运算
+
+zf: mov ax,1
+    sub ax,1 此时zf =1  一般是逻辑或者数学计算影响标识位 类似mov push等是不影响的
+pf: mov al,1
+   add al,10 结果 0001 add 1010 结果是0000 1011 三个1 pf=0
+sf: mov al,10000001b
+    add al,1      结果是 10000010b sf=1 表示如果作为有符号数运算 结果是负数 (注意是补码)
+cs: mov al,98h
+    add al,al    al = ffh cf=1 进一
+    
+    mov al,97h
+    sub,al,98h  al=ffh,cf=1 借一
+
+df: movsb 等价于 es:di=ds:si 如果df=0 则 si=si+1 di=di+1 类似的还有 movsw 
+    rep movsb = s:movsb loop s 根据cx的值来做循环
+    cld df置为0  std df=1 
+
+
+adc指令
+带进位的加法指令 利用了cf
+
+adc op1,op2  功能类似 op1=op1+op2+cf
+mov ax,2
+mov bx,1
+sub bx,ax 此时cf=1 因为借位
+adc ax,1  ;此时 ax=ax+1+cf = 2+1+1 = 4
+依靠该指令可以实现大数相加 对大数 16位等分 分别相加和进位
+
+
+sbb 带借位的减法指令
+
+sbb op1,op2  op1=op1-op2-cf 和adc指令同理
+
+cmp指令
+cmp op1,op2 类似 op1-op2 但是不保存操作结果 仅仅对标志位影响 比如 zf pf sf cf of
+
+比如 cmp ax,bx
+如果ax =bx  zf=1
+    ax!=bx  zf=0
+    ax<bx  cf=1
+    ax>=bx  cf=0等等
+
+这里需要对操作对象是无符号数还是有符号数做分别  比如负数的 sf会异常
+比如 22h-0a0h 如果是负数 那么  0a0 = 1010 0000 如果是补码 那么 原值就是 1110 0000= -96 显然 22h大于0a0
+但是 22h-a0是负数 sf=1 借位了 借1=16 16+2-a=8  结果是82h 且sf=1
+
+综合 sf=1 of=0 说明结果是负数 且没有溢出 那就是正经的负  op>op2
+    sf=1 of =1  溢出才变成的负数 说明原来应该是正数 所以 op1>op2
+    sf=0 of=1 溢出 结果正  op1<op2
+    sf=0 of=0 op1>=op2  
+
+
+所以 无符号数比较 判断 zf cf 
+     有符号数 判断sf of zf
+
+无符号的指令
+je 等于则转移 zf=1
+jne 不等于则转移 zf=0
+
+jb 小于则转移 cf=1
+jnb 大于等于则转移 cf=0 
+
+ja 大于则转移 zf=0且cf=0
+jna 小于等于则转移 cf=1或zf=1
+如果 ah=bh 则 ah=ah+ah  否则 ah=ah+bh
+cmp ah,bh      
+je s
+add ah,bh
+jmp short ok
+s: add ah,ah
+ok:...
+
+
+pushf and popf
+将标志寄存器入栈和出栈 就是上面的那些xf 一次影响16位
