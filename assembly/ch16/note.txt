@@ -15,4 +15,23 @@ mov al,a[si] 等价于 mov al,cs:0[si]
 
 
 也可以在其他段中使用这类标号
+=========
+也可以将标号作为数据来使用
+datasg segment
+ a db 1,2,3,4,5,6,7,8
+ b dw 0
+ c dw a,b    ;等价于 c dw offset a,offset b
+datasg ends
+
+这里 c里面存储的时a,b的偏移地址 
+
+
+datasg segment
+ a db 1,2,3,4,5,6,7,8
+ b dw 0
+ c dd a,b    ;等价于 c dw offset a ,seg a,offset b,seg b
+datasg ends
+
+seg指令获取标号的段地址
+
 
