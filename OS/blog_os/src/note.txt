@@ -1,0 +1,27 @@
+https://os.phil-opp.com/
+
+语言项是一些编译器需求的特殊函数或类型。举例来说，Rust 的 Copy trait 是一个这样的语言项，告诉编译器哪些类型需要遵循复制语义（copy semantics）——当我们查找 Copy trait 的实现时，我们会发现，一个特殊的 #[lang = "copy"] 属性将它定义为了一个语言项，达到与编译器联系的目的。
+我们可以自己实现语言项，但这是下下策：目前来看，语言项是高度不稳定的语言细节实现，它们不会经过编译期类型检查（所以编译器甚至不确保它们的参数类型是否正确）。幸运的是，我们有更稳定的方式，来修复上面的语言项错误。
+eh_personality 语言项标记的函数，将被用于实现栈展开（stack unwinding）。在使用标准库的情况下，当 panic 发生时，Rust 将使用栈展开，来运行在栈上所有活跃的变量的析构函数（destructor）——这确保了所有使用的内存都被释放，允许调用程序的父进程（parent thread）捕获 panic，处理并继续运行。但是，栈展开是一个复杂的过程，如 Linux 的 libunwind 或 Windows 的结构化异常处理（structured exception handling, SEH），通常需要依赖于操作系统的库；所以我们不在自己编写的操作系统中使用它。
+在其它一些情况下，栈展开并不是迫切需求的功能；因此，Rust 提供了在 panic 时中止（abort on panic）的选项。这个选项能禁用栈展开相关的标志信息生成，也因此能缩小生成的二进制程序的长度。
+
+
+
+rustc --version --verbose
+查看当前的宿主系统 其中包含一个目标三元组的字符串
+host: x86_64-unknown-linux-gnu
+其中一行如上
+x86_64 表示cpu架构
+供应商 unknown
+操作系统 linux
+abi gnu
+eabi就是嵌入式abi
+hf hard float
+
+rustup target add thumbv7em-none-eabihf
+添加一个组件 这是一个无操作系统的arm嵌入式系统
+
+
+bios 硬件初始化  比如cpu 内存等 然后自检  控制台初始化  设备初始化  发现总线并初始化 然后选择引导设备 交给os loader 
+如果是硬盘 可能是bios->mbr
+0盘0道1扇区 判断是否是mbr的引导程序 512 byte可能不够  所以可能是一个引导程序  然后mbr再加载系统
