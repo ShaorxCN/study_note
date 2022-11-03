@@ -1,3 +1,4 @@
 */.vscode/
 rust/*/target
 OS/*/target
+*/Cargo.lock
