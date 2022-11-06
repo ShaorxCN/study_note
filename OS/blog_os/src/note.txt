@@ -25,3 +25,9 @@ rustup target add thumbv7em-none-eabihf
 bios 硬件初始化  比如cpu 内存等 然后自检  控制台初始化  设备初始化  发现总线并初始化 然后选择引导设备 交给os loader 
 如果是硬盘 可能是bios->mbr
 0盘0道1扇区 判断是否是mbr的引导程序 512 byte可能不够  所以可能是一个引导程序  然后mbr再加载系统
+
+
+tip：
+项目内配置.cargo/config 寻址顺序是 从执行命令的目录下找.carog/config 一直网上 最后到cargo_home
+
+每个集成测试都有自己的可执行文件 也就是单独入口 所以tests/下的都是跑在自己的runner里的 可以修改自己的逻辑

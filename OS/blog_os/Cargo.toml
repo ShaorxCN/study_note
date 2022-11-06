@@ -11,6 +11,8 @@ edition = "2021"
 bootloader = "0.9.3"
 volatile = "0.2.6"
 spin = "0.9.4"
+x86_64 = "0.14.10"
+uart_16550 = "0.2.0"  # 串口通信实现内核向宿主系统发送数据
 
 [dependencies.lazy_static]
 version = "1.0"
@@ -19,3 +21,11 @@ features = ["spin_no_std"]
 
 [package.metadata.bootimage]
 build-command = ["xbuild"]
+test-args = ["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04","-serial", "stdio","-display", "none"]
+test-success-exit-code = 33
+test-timeout = 300  # 单位second
+
+# 对于单个函数的测试 无需runner 直接_start入口调用即可
+[[test]]
+name = "should_panic"
+harness = false
