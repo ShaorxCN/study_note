@@ -4,8 +4,8 @@
 // #![test_runner(test_runner)]
 // #![reexport_test_harness_main = "test_main"]
 
+use blog_os::{exit_qemu, serial_println, QemuExitCode};
 use core::panic::PanicInfo;
-use blog_os::{QemuExitCode,exit_qemu,serial_println};
 
 // 这里panic反而是ok的 且只要panic就退出 一个就结束 // TODO
 #[panic_handler]
