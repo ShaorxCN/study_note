@@ -574,7 +574,7 @@ fn test_breakpoint_exception() {
     // invoke a breakpoint exception
     serial_print!("test_breakpoint_exception... "); //应该是漏掉了?
     x86_64::instructions::interrupts::int3();
-    serial_println!("[ok]"); //应该是漏掉了?
+    serial_println!("[ok]"); 
 }
 ```
 
