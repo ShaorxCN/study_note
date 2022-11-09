@@ -268,6 +268,7 @@ On a normal function call (using the call instruction), the CPU pushes the retur
 7. **Pushing an error code (for some exceptions)**: For some specific exceptions, such as page faults, the CPU pushes an error code, which describes the cause of the exception.
 8. **Invoking the interrupt handler**: The CPU reads the address and the segment descriptor of the interrupt handler function from the corresponding field in the IDT. It then invokes this handler by loading the values into the rip and cs registers.
 
+步骤如下:
 
 1. **保存原来的栈指针**:cpu读取栈指针(rsp)和栈段寄存器(ss)的值 并且将他们保存再内部的缓冲区内。
 2. **对齐堆栈指针**: 因为中断可能随时都会发生，所以栈指针的值也是无法确定的。但是一些cpu指令(例如 一些SSE指令)需要栈指针按照16字节对齐。所以cpu在接收到中断后立刻实施该操作。
