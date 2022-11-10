@@ -1,7 +1,7 @@
 <h1>Double Faults(双重故障)</h1>
 This post explores the double fault exception in detail, which occurs when the CPU fails to invoke an exception handler. By handling this exception, we avoid fatal triple faults that cause a system reset. To prevent triple faults in all cases, we also set up an Interrupt Stack Table to catch double faults on a separate kernel stack.
 
-这篇文章将会详细的探究双重故障(二次异常?)的细节，该异常在cpu无法正常处理异常处理程序的时候产生。通过处理该异常吗，我们能够避免导致系统重置的三重故障。为了保证在所有情况下都能避免三重故障，我们需要配置一个中断栈表，以便在单独的内核栈上捕捉二重故障。
+这篇文章将会详细的探究双重故障(二次异常?)的细节，该异常在cpu无法正常处理异常处理程序的时候产生。通过处理该异常，我们能够避免导致系统重置的三重故障。为了保证在所有情况下都能避免三重故障，我们需要配置一个中断栈表，以便在单独的内核栈上捕捉二重故障。
 
 This blog is openly developed on GitHub. If you have any problems or questions, please open an issue there. 
 You can also leave comments at the bottom. The complete source code for this post can be found in the post-06 branch.
@@ -24,6 +24,7 @@ A double fault behaves like a normal exception. It has the vector number `8` and
 <h3>Triggering a Double Fault(触发双重故障)</h3>
 
 Let’s provoke a double fault by triggering an exception for which we didn’t define a handler function:
+
 我们通过触发一个没有设置处理程序的异常来引发双重故障:
 ```rust
 // in src/main.rs
@@ -63,12 +64,12 @@ When we start our kernel now, we see that it enters an endless boot loop. The re
 
 1. CPU尝试向`0xdeadbeef`写入数据，引发了一个页错误。
 2. CPU尝试在IDT中查找对应表项，但是发现并没有注册对应的处理函数。因此，他无法调用页错误处理程序，引发一个双重故障
-3. CPU在IDT查找双重故障对应的表项，但是发现双重故障也没有指定处理程序。因此，出发了三重故障。
+3. CPU在IDT查找双重故障对应的表项，但是发现双重故障也没有指定处理程序。因此，触发了三重故障。
 4. 三重故障是致命的。QEMU和大多数硬件一样对此做出反应，命令系统重置。
    
 So in order to prevent this triple fault, we need to either provide a handler function for page faults or a double fault handler. We want to avoid triple faults in all cases, so let’s start with a double fault handler that is invoked for all unhandled exception types.
 
-为了防止三种故障的发生，我们需要提供一个页错误的处理函数或者提供一个双重故障的处理函数。我们希望在任何情况下都能避免三种故障的产生，所以，我们从所有未注册异常都将调用的双重故障处理程序开始。
+为了防止三重故障的发生，我们需要提供一个页错误的处理函数或者提供一个双重故障的处理函数。我们希望在任何情况下都能避免三重故障的产生，所以，我们从所有未注册异常都将调用的双重故障处理程序开始。
 
 <h2>A Double Fault Handler(双重故障处理程序)</h2>
 
@@ -98,9 +99,10 @@ extern "x86-interrupt" fn double_fault_handler(
 
 Our handler prints a short error message and dumps the exception stack frame. The error code of the double fault handler is always zero, so there’s no reason to print it. One difference to the breakpoint handler is that the double fault handler is [diverging](https://doc.rust-lang.org/stable/rust-by-example/fn/diverging.html). The reason is that the `x86_64` architecture does not permit returning from a double fault exception.
 
-我们的处理程序会输出一段简短的错误信息并且导出异常栈帧。双重故障的错误码总是0，所以我们没必要打印出来。和断点异常程序有一点不同的是，双重故障处理函数是一个[发散函数](https://doc.rust-lang.org/stable/rust-by-example/fn/diverging.html))。因为`x86_64`架构禁止从一个双重故障异常中返回。
+我们的处理程序会输出一段简短的错误信息并且导出异常栈帧。双重故障的错误码总是0，所以我们没必要打印出来。和断点异常程序有一点不同的是，双重故障处理函数是一个[发散函数](https://doc.rust-lang.org/stable/rust-by-example/fn/diverging.html)。因为`x86_64`架构禁止从一个双重故障异常中返回。
 
 When we start our kernel now, we should see that the double fault handler is invoked:
+
 现在我们启动内核，我们可以看到双重故障程序被正常的调用了:
 
 <img src=./img/qemu-catch-double-fault.png>
@@ -196,11 +198,11 @@ Let’s look at the fourth question:
 
 A guard page is a special memory page at the bottom of a stack that makes it possible to detect stack overflows. The page is not mapped to any physical frame, so accessing it causes a page fault instead of silently corrupting other memory. The bootloader sets up a guard page for our kernel stack, so a stack overflow causes a page fault.
 
-保护页是栈底的特殊内存页，可用来检测栈溢出。该页面未映射到任何物理内存，因此对其进行的访问动作将会导致页错误，而不是静默的非法访问其他内存。bootloader为我们的内核栈设置了一个保护页面，因此栈溢出会导致页面错误。
+保护页是栈底的特殊内存页，可用来检测栈溢出。该页面未映射到任何物理内存，因此对其进行的访问动作将会导致页错误，而不是静默的非法访问其他内存。bootloader为我们的内核栈设置了一个保护页，因此栈溢出会导致页错误。
 
 When a page fault occurs, the CPU looks up the page fault handler in the IDT and tries to push the [interrupt stack frame](https://os.phil-opp.com/cpu-exceptions/#the-interrupt-stack-frame) onto the stack. However, the current stack pointer still points to the non-present guard page. Thus, a second page fault occurs, which causes a double fault (according to the above table).
 
-当发生页面错误时，CPU在IDT中查找页面错误处理程序，并尝试将[中断栈帧](https://os.phil-opp.com/cpu-exceptions/#the-interrupt-stack-frame)压栈。但是，当前的栈指针仍指向不存在的保护页。于是，发生第二个页面错误，这将导致双重故障（根据上表）。
+当发生页错误时，CPU在IDT中查找页错误处理程序，并尝试将[中断栈帧](https://os.phil-opp.com/cpu-exceptions/#the-interrupt-stack-frame)压栈。但是，当前的栈指针仍指向不存在的保护页。于是，发生第二个页面错误，这将导致双重故障（根据上表）。
 
 So the CPU tries to call the double fault handler now. However, on a double fault, the CPU tries to push the exception stack frame, too. The stack pointer still points to the guard page, so a third page fault occurs, which causes a triple fault and a system reboot. So our current double fault handler can’t avoid a triple fault in this case.
 
@@ -262,11 +264,11 @@ For each exception handler, we can choose a stack from the IST through the `stac
 
 The Interrupt Stack Table (IST) is part of an old legacy structure called [Task State Segment](https://en.wikipedia.org/wiki/Task_state_segment) (TSS). The TSS used to hold various pieces of information (e.g., processor register state) about a task in 32-bit mode and was, for example, used for hardware context switching. However, hardware context switching is no longer supported in 64-bit mode and the format of the TSS has changed completely.
 
-中断栈表(IST)是原价架构遗留的结构体[任务状态段](https://en.wikipedia.org/wiki/Task_state_segment)(TSS)中的一部分。在32位模式下TSS曾用于保存有关任务的各种信息（如处理器寄存器状态），例如用于硬件上下文切换。但是，在64位模式下不再支持硬件上下文切换，并且TSS的格式也完全改变了。
+中断栈表(IST)是架构遗留的结构体[任务状态段](https://en.wikipedia.org/wiki/Task_state_segment)(TSS)中的一部分。在32位模式下TSS曾用于保存有关任务的各种信息（如处理器寄存器状态），例如用于硬件上下文切换。但是，在64位模式下不再支持硬件上下文切换，并且TSS的格式也完全改变了。
 
 On x86_64, the TSS no longer holds any task-specific information at all. Instead, it holds two stack tables (the IST is one of them). The only common field between the 32-bit and 64-bit TSS is the pointer to the [I/O port permissions bitmap](https://en.wikipedia.org/wiki/Task_state_segment#I.2FO_port_permissions).
 
-在x86_64上，TSS完全不再保存任何特定任务的信息。相反，它持有两个栈表（IST是其中之一）。32位和64位TSS之间唯一的共同字段是指向[I/O端口权限位图]((https://en.wikipedia.org/wiki/Task_state_segment#I.2FO_port_permissions))的指针。
+在x86_64上，TSS完全不再保存任何特定任务的信息。相反，它持有两个栈表（IST是其中之一）。32位和64位TSS之间唯一的共同字段是指向[I/O端口权限位图](https://en.wikipedia.org/wiki/Task_state_segment#I.2FO_port_permissions)的指针。
 
 The 64-bit TSS has the following format:
 
@@ -386,7 +388,7 @@ As before, we use `lazy_static` again. We create a new GDT with a code segment a
 
 To load our GDT, we create a new `gdt::init` function that we call from our `init` function:
 
-创建一个新的`gdt::init`函数用于载GDT，我们再从总`init`函数中调用该初始化：
+创建一个新的`gdt::init`函数用于加载GDT，我们再从总`init`函数中调用该初始化：
 
 ```rust
 // in src/gdt.rs
@@ -452,7 +454,7 @@ struct Selectors {
 
 Now we can use the selectors to reload the `cs` register and load our `TSS`:
 
-现在，可以使用选择器来重载cs段寄存器并加载我们的TSS：
+现在，可以使用选择器来重载cs寄存器并加载我们的TSS：
 
 ```rust
 // in src/gdt.rs
@@ -543,7 +545,7 @@ fn panic(info: &PanicInfo) -> ! {
 
 Like our `panic_handler` test, the test will run [without a test harness](https://os.phil-opp.com/testing/#no-harness-tests). The reason is that we can’t continue execution after a double fault, so more than one test doesn’t make sense. To disable the test harness for the test, we add the following to our `Cargo.toml`:
 
-就像我们的`panic_handler`测试一样，该测试将在[没有测试环境](https://os.phil-opp.com/testing/#no-harness-tests)的条件下运行。这是因为出现双重错误后程序无法继续执行，因此执行多于一个的测试是没有意义的。要禁用测试的测试环境，我们将以下内容添加到我们的`Cargo.toml`中：
+就像我们的`panic_handler`测试一样，该测试将在[没有测试控制](https://os.phil-opp.com/testing/#no-harness-tests)的条件下运行。这是因为出现双重错误后程序无法继续执行，因此执行多于一个的测试是没有意义的。要禁用测试控制运行该测试，我们将以下内容添加到我们的`Cargo.toml`中：
 
 ```
 # in Cargo.toml
@@ -595,7 +597,7 @@ We call our `gdt::init` function to initialize a new GDT. Instead of calling our
 
 The `stack_overflow` function is almost identical to the function in our main.rs. The only difference is that at the end of the function, we perform an additional [volatile](https://en.wikipedia.org/wiki/Volatile_(computer_programming)) read using the [Volatile](https://docs.rs/volatile/0.2.6/volatile/struct.Volatile.html) type to prevent a compiler optimization called [tail call elimination](https://en.wikipedia.org/wiki/Tail_call). Among other things, this optimization allows the compiler to transform a function whose last statement is a recursive function call into a normal loop. Thus, no additional stack frame is created for the function call, so the stack usage remains constant.
 
-`stack_overflow`函数与`main.rs`中的函数几乎相同。唯一的不同是，我们在函数末尾使用[Volatile](https://docs.rs/volatile/0.2.6/volatile/struct.Volatile.html)类型进行了额外的[易失性](https://en.wikipedia.org/wiki/Volatile_(computer_programming)) 读取，以防止称为[尾调用消除](https://en.wikipedia.org/wiki/Tail_call)的编译器优化。此优化允许编译器将最后一条语句为递归调用的递归函数，从递归调用函数转换为带有循环的普通函数。若有此优化，则递归化为循环后函数将不再会新建额外的栈帧，于是该函数对于栈的使用将变为常量。
+`stack_overflow`函数与`main.rs`中的函数几乎相同。唯一的不同是，我们在函数末尾使用[Volatile](https://docs.rs/volatile/0.2.6/volatile/struct.Volatile.html)类型进行了额外的[易失性](https://en.wikipedia.org/wiki/Volatile_(computer_programming)) 读取，以防止称为[尾调用消除](https://en.wikipedia.org/wiki/Tail_call)的编译器优化。此优化允许编译器将最后一条语句为递归调用函数的递归函数，从递归调用函数转换为带有循环的普通函数。若有此优化，则递归化为循环后函数将不再会新建额外的栈帧，于是该函数对于栈的使用将变为常量。
 
 In our case, however, we want the stack overflow to happen, so we add a dummy volatile read statement at the end of the function, which the compiler is not allowed to remove. Thus, the function is no longer tail recursive, and the transformation into a loop is prevented. We also add the `allow(unconditional_recursion)` attribute to silence the compiler warning that the function recurses endlessly.
 
@@ -632,11 +634,12 @@ pub fn init_test_idt() {
 
 The implementation is very similar to our normal IDT in `interrupts.rs`. Like in the normal IDT, we set a stack index in the IST for the double fault handler in order to switch to a separate stack. The `init_test_idt` function loads the IDT on the CPU through the `load` method.
 
-该实现和于我们在`interrupts.rs`中的IDT十分类似。和正常的IDT一种，我们给用于双重故障处理程序的IST设置栈索引，以便触发异常时切换到这个已知良好的栈。最后`init_test_idt`函数通过load方法将IDT加载到CPU上。
+该实现和于我们在`interrupts.rs`中的IDT十分类似。和正常的IDT一样，我们给用于双重故障处理程序的IST设置栈索引，以便触发异常时切换到这个已知良好的栈。最后`init_test_idt`函数通过load方法将IDT加载到CPU上。
 
 <h3>The Double Fault Handler(双重故障处理程序)</h3>
 
 The only missing piece is our double fault handler. It looks like this:
+
 现在缺失的只有双重故障处理程序部分了，如下所示:
 
 ```rust
