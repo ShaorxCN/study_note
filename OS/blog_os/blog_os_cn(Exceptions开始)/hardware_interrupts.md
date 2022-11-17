@@ -13,7 +13,7 @@ This blog is openly developed on GitHub. If you have any problems or questions, 
 
 Interrupts provide a way to notify the CPU from attached hardware devices. So instead of letting the kernel periodically check the keyboard for new characters (a process called [polling](https://en.wikipedia.org/wiki/Polling_(computer_science))), the keyboard can notify the kernel of each keypress. This is much more efficient because the kernel only needs to act when something happened. It also allows faster reaction times since the kernel can react immediately and not only at the next poll.
 
-中断为连接到CPU上的硬件设置提供了一种通知CPU的方法。这样CPU不必定期检查键盘是否有新的字符输入(一种称为[轮询](https://en.wikipedia.org/wiki/Polling_(computer_science)的过程),而是键盘将每次按键事件通知给内核。这样会很高效，因为内核只需要在事件发生的时候去做反应就可以了。这样也能大大缩短事件的反应事件，因为这样内核可以立刻反应而不是需要等待下次轮询的时候。
+中断为连接到CPU上的硬件设备提供了一种通知CPU的方法。这样CPU不必定期检查键盘是否有新的字符输入(一种称为[轮询](https://en.wikipedia.org/wiki/Polling_(computer_science))的过程), 而是键盘将每次按键事件通知给内核。这样会很高效，因为内核只需要在事件发生的时候去做反应就可以了。这样也能大大缩短事件的反应事件，因为这样内核可以立刻反应而不是需要等待下次轮询的时候。
 
 Connecting all hardware devices directly to the CPU is not possible. Instead, a separate interrupt controller aggregates the interrupts from all devices and then notifies the CPU:
 
@@ -21,11 +21,13 @@ Connecting all hardware devices directly to the CPU is not possible. Instead, a 
 
 
 ```
+
                                     ____________             _____
                Timer ------------> |            |           |     |
                Keyboard ---------> | Interrupt  |---------> | CPU |
                Other Hardware ---> | Controller |           |_____|
                Etc. -------------> |____________|
+
 ```
 
 Most interrupt controllers are programmable, which means they support different priority levels for interrupts. For example, this allows to give timer interrupts a higher priority than keyboard interrupts to ensure accurate timekeeping.
@@ -34,7 +36,7 @@ Most interrupt controllers are programmable, which means they support different 
 
 Unlike exceptions, hardware interrupts occur asynchronously. This means they are completely independent from the executed code and can occur at any time. Thus, we suddenly have a form of concurrency in our kernel with all the potential concurrency-related bugs. Rust’s strict ownership model helps us here because it forbids mutable global state. However, deadlocks are still possible, as we will see later in this post.
 
-和异常不一样的是，硬件中断时异步发生的。这就代表他们和当前执行的代码完全无关并且随时可能发生。因此，我们内核中忽然出现了并发的情况并且出现了潜在的并发bug。好在Rust严格的所有权模型帮助在这里帮了大忙，因为他禁止了全局可变状态。然而，死锁还是可能发生，我们可以在后文中看到。
+和异常不一样的是，硬件中断是异步发生的。这就代表他们和当前执行的代码完全无关并且随时可能发生。因此，我们内核中忽然出现了并发的情况并且出现了潜在的并发bug。好在Rust严格的所有权模型在这里帮了大忙，因为他禁止了全局可变状态。然而，死锁还是可能发生，我们可以在后文中看到。
 
 <h2>The 8259 PIC (8259 可编程中断控制器)</h2>
 
@@ -46,8 +48,9 @@ The 8259 has eight interrupt lines and several lines for communicating with the 
 
 8259有8条中断线和几条用于与CPU通讯的线。当年的典型系统会配备两个8259 PIC实例，一个主控制器和一个通过中断线连接在主控上的从控制器：
 
+```
 
-```                     ____________                          ____________
+                     ____________                          ____________
 Real Time Clock --> |            |   Timer -------------> |            |
 ACPI -------------> |            |   Keyboard-----------> |            |      _____
 Available --------> | Secondary  |----------------------> | Primary    |     |     |
@@ -56,6 +59,7 @@ Mouse ------------> | Controller |   Serial Port 1 -----> | Controller |     |__
 Co-Processor -----> |            |   Parallel Port 2/3 -> |            |
 Primary ATA ------> |            |   Floppy disk -------> |            |
 Secondary ATA ----> |____________|   Parallel Port 1----> |____________|
+
 
 ```
 
@@ -76,7 +80,7 @@ PIC的默认配置不可用，因为它会将范围为0到15的中断向量编�
 
 The configuration happens by writing special values to the command and data ports of the PICs. Fortunately, there is already a crate called [pic8259](https://docs.rs/pic8259/0.10.1/pic8259/), so we don’t need to write the initialization sequence ourselves. However, if you are interested in how it works, check out [its source code](https://docs.rs/crate/pic8259/0.10.1/source/src/lib.rs). It’s fairly small and well documented.
 
-我们可以通过向PIC的命令和数据端口写入特殊值来使配置生效。幸运的是，已经有一个名为[pic8259_simple](https://docs.rs/pic8259/0.10.1/pic8259/)的crate，因此我们不需要自己编写初始化过程。如果你对它的工作方式感兴趣，请查看它的[源代码](https://docs.rs/crate/pic8259/0.10.1/source/src/lib.rs)，该crate很小并且文档齐全。
+我们可以通过向PIC的命令和数据端口写入特殊值来使配置生效。幸运的是，已经有一个名为[pic8259](https://docs.rs/pic8259/0.10.1/pic8259/)的crate，因此我们不需要自己编写初始化过程。如果你对它的工作方式感兴趣，请查看它的[源代码](https://docs.rs/crate/pic8259/0.10.1/source/src/lib.rs)，该crate很小并且文档齐全。
 
 To add the crate as a dependency, we add the following to our project:
 
@@ -128,7 +132,7 @@ pub fn init() {
 
 We use the [initialize](https://docs.rs/pic8259/0.10.1/pic8259/struct.ChainedPics.html#method.initialize) function to perform the PIC initialization. Like the `ChainedPics::new` function, this function is also unsafe because it can cause undefined behavior if the PIC is misconfigured.
 
-我们使用[initialize](https://docs.rs/pic8259_simple/0.2.0/pic8259_simple/struct.ChainedPics.html#method.initialize)函数来执行PIC初始化。与ChainedPics::new函数一样，该函数也是非安全的，因为如果PIC配置错误，使用它也将可能导致未定义的行为。
+我们使用[initialize](https://docs.rs/pic8259_simple/0.2.0/pic8259_simple/struct.ChainedPics.html#method.initialize)函数来执行PIC初始化。与`ChainedPics::new`函数一样，该函数也是非安全的，因为如果PIC配置错误，使用它也将可能导致未定义的行为。
 
 If all goes well, we should continue to see the “It did not crash” message when executing `cargo run`.
 
@@ -191,7 +195,7 @@ impl InterruptIndex {
 
 The enum is a [C-like enum](https://doc.rust-lang.org/reference/items/enumerations.html#custom-discriminant-values-for-fieldless-enumerations) so that we can directly specify the index for each variant. The `repr(u8)` attribute specifies that each variant is represented as a `u8`. We will add more variants for other interrupts in the future.
 
-该枚举是一个C风格枚举，因此我们可以直接为每个成员变量指定索引。`repr(u8)`属性指定每个变体都表示为`u8`。将来我们还会添加更多中断变量。
+该枚举是一个[C风格枚举](https://doc.rust-lang.org/reference/items/enumerations.html#custom-discriminant-values-for-fieldless-enumerations)，因此我们可以直接为每个成员变量指定索引。`repr(u8)`属性指定每个变量都表示为`u8`。将来我们还会添加更多中断变量。
 
 Now we can add a handler function for the timer interrupt:
 
@@ -282,7 +286,7 @@ The hardware timer that we use is called the Programmable Interval Timer, or PIT
 
 We now have a form of concurrency in our kernel: The timer interrupts occur asynchronously, so they can interrupt our `_start` function at any time. Fortunately, Rust’s ownership system prevents many types of concurrency-related bugs at compile time. One notable exception is deadlocks. Deadlocks occur if a thread tries to acquire a lock that will never become free. Thus, the thread hangs indefinitely.
 
-现在，我们的内核中具有了一种并发形式：定时器中断会异步的发生，因此它们可以随时中断我们的`_start`函数。幸运的是，Rust的所有权系统可以在编译时就能够防止很多与并发相关的bug。不过，死锁是一个值得注意的例外。如果线程试图获取永远不会释放的锁，则会发生死锁。此时，线程会无限期地挂起。
+现在，我们的内核中具有了一种并发形式：计时器中断会异步的发生，因此它们可以随时中断我们的`_start`函数。幸运的是，Rust的所有权系统可以在编译时就能够防止很多与并发相关的bug。不过，死锁是一个值得注意的例外。如果线程试图获取永远不会释放的锁，则会发生死锁。此时，线程会无限期地挂起。
 
 We can already provoke a deadlock in our kernel. Remember, our `println` macro calls the `vga_buffer::_print` function, which [locks a global WRITER](https://os.phil-opp.com/vga-text-mode/#spinlocks) using a spinlock:
 
@@ -354,7 +358,7 @@ When we run it in QEMU, we get an output of the form:
 
 We see that only a limited number of hyphens are printed until the first timer interrupt occurs. Then the system hangs because the timer interrupt handler deadlocks when it tries to print a dot. This is the reason that we see no dots in the above output.
 
-我们看到只有有限的连字符被打印，当第一次定时器中断发生时便停止打印。之后系统挂起，因为计时器中断处理程序在尝试打印点时会死锁。这就是我们在上面的输出中看不到任何点的原因。
+我们看到只有有限的连字符被打印，当第一次计时器中断发生时便停止打印。之后系统挂起，因为计时器中断处理程序在尝试打印点时会死锁。这就是我们在上面的输出中看不到任何点的原因。
 
 The actual number of hyphens varies between runs because the timer interrupt occurs asynchronously. This non-determinism is what makes concurrency-related bugs so difficult to debug.
 
@@ -454,7 +458,7 @@ fn test_println_output() {
 
 The test prints a string to the VGA buffer and then checks the output by manually iterating over the `buffer_char`s array. The race condition occurs because the timer interrupt handler might run between the `println` and the reading of the screen characters. Note that this isn’t a dangerous data race, which Rust completely prevents at compile time. See the [Rustonomicon](https://doc.rust-lang.org/nomicon/races.html) for details.
 
-该测试将一个字符串打印到VGA缓冲区，然后通过手动迭代`buffer_chars`数组来检查输出。由于计时器中断处理程序可能在`println`之后，读取屏幕字符之前运行（中断处理函数会输出一个.），因此发生竞争状态。请注意，这不是危险的数据竞争，Rust在编译时完全避免了这种竞争。有关详细信息，请参见[Rustonomicon](https://doc.rust-lang.org/nomicon/races.html)。
+该测试将一个字符串打印到VGA缓冲区，然后通过手动迭代`buffer_chars`数组来检查输出。由于计时器中断处理程序可能在`println`之后，读取屏幕字符之前运行（中断处理函数会输出一个`.`），因此发生竞争状态。请注意，这不是危险的数据竞争，Rust在编译时完全避免了这种竞争。有关详细信息，请参见[Rustonomicon](https://doc.rust-lang.org/nomicon/races.html)。
 
 
 To fix this, we need to keep the `WRITER` locked for the complete duration of the test, so that the timer handler can’t write a `.` to the screen in between. The fixed test looks like this:
@@ -589,7 +593,7 @@ When we run our kernel now in QEMU, we see a much lower CPU usage.
 
 
 
-</h2>Keyboard Input(键盘输入)</h2>
+<h2>Keyboard Input(键盘输入)</h2>
 
 Now that we are able to handle interrupts from external devices, we are finally able to add support for keyboard input. This will allow us to interact with our kernel for the first time.
 
@@ -807,7 +811,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
 
 We use the `lazy_static` macro to create a static `Keyboard` object protected by a `Mutex`. We initialize the Keyboard with a US keyboard layout and the scancode set 1. The [HandleControl](https://docs.rs/pc-keyboard/0.5.0/pc_keyboard/enum.HandleControl.html) parameter allows to map `ctrl+[a-z]` to the Unicode characters `U+0001` through `U+001A`. We don’t want to do that, so we use the `Ignore` option to handle the `ctrl` like normal keys.
 
-通过`lazy_static`宏创建一个由`Mutex`保护的静态`Keyboard`对象。使用美式键盘布局和扫描码集1初始化`Keyboard`。[HandleControl](https://docs.rs/pc-keyboard/0.5.0/pc_keyboard/enum.HandleControl.html)参数允许将`ctrl+[a-z]`映射到`U+0001`至`U+001A`的Unicode字符上。我们并不想这样做，因此使用Ignore选项来像处理普通键一样处理`ctrl`。
+通过`lazy_static`宏创建一个由`Mutex`保护的静态`Keyboard`对象。使用美式键盘布局和扫描码集1初始化`Keyboard`。[HandleControl](https://docs.rs/pc-keyboard/0.5.0/pc_keyboard/enum.HandleControl.html)参数允许将`ctrl+[a-z]`映射到`U+0001`至`U+001A`的Unicode字符上。我们并不想这样做，因此使用`Ignore`选项来像处理普通键一样处理`ctrl`。
 
 On each interrupt, we lock the Mutex, read the scancode from the keyboard controller, and pass it to the [add_byte](https://docs.rs/pc-keyboard/0.5.0/pc_keyboard/struct.Keyboard.html#method.add_byte) method, which translates the scancode into an `Option<KeyEvent>`. The [KeyEvent](https://docs.rs/pc-keyboard/0.5.0/pc_keyboard/struct.KeyEvent.html) contains the key which caused the event and whether it was a press or release event.
 
