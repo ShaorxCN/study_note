@@ -16,18 +16,18 @@ pub extern "C" fn _start() -> ! {
     // unsafe {
     //     *(0xdeadbeef as *mut u64) = 42;
     // };
-    #[allow(unconditional_recursion)]
-    fn stack_overflow() {
-        stack_overflow();
-    }
+    // #[allow(unconditional_recursion)]
+    // fn stack_overflow() {
+    //     stack_overflow();
+    // }
 
-    stack_overflow();
+    // stack_overflow();
 
     #[cfg(test)]
     test_main();
 
     println!("it did not crash!");
-    loop {}
+    blog_os::hlt_loop();
 }
 
 // ！返回 发散型函数 表示没有返回 后面如果有代码也不会执行 有的话编译也会提示unreachable
@@ -35,7 +35,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     println!("{}", _info);
-    loop {}
+    blog_os::hlt_loop();
 }
 
 // 指定test的时候使用串口通信输出到宿主机器 而不是qemu

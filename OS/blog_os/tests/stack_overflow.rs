@@ -3,10 +3,10 @@
 #![feature(abi_x86_interrupt)]
 
 use blog_os::serial_print;
+use blog_os::{exit_qemu, serial_println, QemuExitCode};
 use core::panic::PanicInfo;
 use lazy_static::lazy_static;
-use x86_64::structures::idt::{InterruptDescriptorTable,InterruptStackFrame};
-use blog_os::{exit_qemu,QemuExitCode,serial_println};
+use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 lazy_static! {
     static ref TEST_IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
@@ -19,8 +19,7 @@ lazy_static! {
     };
 }
 
-
-pub fn init_test_idt(){
+pub fn init_test_idt() {
     TEST_IDT.load();
 }
 
@@ -48,10 +47,11 @@ fn stack_overflow() {
     volatile::Volatile::new(0).read(); // prevent tail recursion optimizations
 }
 
-
-extern "x86-interrupt" fn test_double_fault_handler(_stack_frame:InterruptStackFrame,_error_code:u64)->!{
+extern "x86-interrupt" fn test_double_fault_handler(
+    _stack_frame: InterruptStackFrame,
+    _error_code: u64,
+) -> ! {
     serial_println!("[ok]");
     exit_qemu(QemuExitCode::Success);
-    loop{}
+    loop {}
 }
-
