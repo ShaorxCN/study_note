@@ -15,7 +15,7 @@ This blog is openly developed on GitHub. If you have any problems or questions, 
 
 One main task of an operating system is to isolate programs from each other. Your web browser shouldn’t be able to interfere with your text editor, for example. To achieve this goal, operating systems utilize hardware functionality to ensure that memory areas of one process are not accessible by other processes. There are different approaches depending on the hardware and the OS implementation.
 
-操作系统一个最主要的任务就是将程序互相隔离开来。比如，我们的浏览器程序不应当能够干扰到文本编辑器程序。为了达到这个目的，操作系统会使用硬件功能来确保一个进程的内存区域不会被其他进程访问。根据硬件和操作系统的实现，有不用的方法实现。
+操作系统一个最主要的任务就是将程序互相隔离开来。比如，我们的浏览器程序不应当能够干扰到文本编辑器程序。为了达到这个目的，操作系统会使用硬件功能来确保一个进程的内存区域不会被其他进程访问。根据硬件和操作系统的实现，有不同的方法实现。
 
 As an example, some ARM Cortex-M processors (used for embedded systems) have a [Memory Protection Unit](https://developer.arm.com/docs/ddi0337/e/memory-protection-unit/about-the-mpu) (MPU), which allows you to define a small number (e.g., 8) of memory regions with different access permissions (e.g., no access, read-only, read-write). On each memory access, the MPU ensures that the address is in a region with correct access permissions and throws an exception otherwise. By changing the regions and access permissions on each process switch, the operating system can ensure that each process only accesses its own memory and thus isolates processes from each other.
 
@@ -42,7 +42,7 @@ In the first version of segmentation, the segment registers directly contained t
 
 By modifying the memory addresses before the actual access, segmentation already employed a technique that is now used almost everywhere: virtual memory.
 
-通过在实际访问之前修改内存地址，分段技术已经使用了一种现在几乎处处使用的结束:虚拟内存。
+通过在实际访问之前修改内存地址，分段技术已经使用了一种现在几乎处处使用的技术:虚拟内存。
 
 
 <h3>Virtual Memory(虚拟内存)</h3>
@@ -63,7 +63,7 @@ An example where this property is useful is running the same program twice in pa
 
 Here the same program runs twice, but with different translation functions. The first instance has a segment offset of 100, so that its virtual addresses 0–150 are translated to the physical addresses 100–250. The second instance has an offset of 300, which translates its virtual addresses 0–150 to physical addresses 300–450. This allows both programs to run the same code and use the same virtual addresses without interfering with each other.
 
-这里就是将同一个程序运行了两次，但是经过不同的翻译转换。第一个实例的段偏移量是100，所以它的虚拟地址0-150被翻译成物理地址100-250。第二个实例的偏移量为300，将其虚拟地址0-150转换为物理地址300-450。这使得两个程序可以运行相同的代码，使用相同的虚拟地址，而不会相互干扰。(编译的时候确定虚拟地址)。
+这里就是将同一个程序运行了两次，但是经过不同的翻译转换。第一个实例的段偏移量是100，所以它的虚拟地址0-150被转换成物理地址100-250。第二个实例的偏移量为300，将其虚拟地址0-150转换为物理地址300-450。这使得两个程序可以运行相同的代码，使用相同的虚拟地址，而不会相互干扰。(编译的时候确定虚拟地址)。
 
 Another advantage is that programs can now be placed at arbitrary physical memory locations, even if they use completely different virtual addresses. Thus, the OS can utilize the full amount of available memory without needing to recompile programs.
 
@@ -84,7 +84,7 @@ There is no way to map the third instance of the program to virtual memory witho
 
 One way to combat this fragmentation is to pause execution, move the used parts of the memory closer together, update the translation, and then resume execution:
 
-对付这种碎片化的方法之一是暂停执行，将使用过的内存部分移近，更新翻译，然后恢复执行:
+对付这种碎片化的方法之一是暂停执行，将使用过的内存部分移近，更新转换，然后恢复执行:
 
 <img src="./img/segmentation-fragmentation-compacted.svg">
 
@@ -127,7 +127,7 @@ Compared to segmentation, paging uses lots of small, fixed-sized memory regions 
 
 Or it seems like no fragmentation occurs. There is still some hidden kind of fragmentation, the so-called internal fragmentation. Internal fragmentation occurs because not every memory region is an exact multiple of the page size. Imagine a program of size 101 in the above example: It would still need three pages of size 50, so it would occupy 49 bytes more than needed. To differentiate the two types of fragmentation, the kind of fragmentation that happens when using segmentation is called external fragmentation.
 
-或者说，看起来没有碎片化发生。仍然有一些隐藏的碎片，即所谓的内部碎片。内部碎片的发生是因为并非每个内存区域都是页面大小的精确倍数。想象一下，在上面的例子中，一个大小为101的程序。它仍然需要三个大小为50的页面，所以它占用的字节数会比需要的多49个。为了区分这两种类型的碎片，使用分段时发生的那种碎片被称为外部碎片。
+或者说，看起来没有碎片化发生。仍然有一些隐藏的碎片，即所谓的内部碎片。内部碎片的发生是因为并非每个内存区域都是页大小的精确倍数。想象一下，在上面的例子中，一个大小为101的程序。它仍然需要三个大小为50的页，所以它占用的字节数会比需要的多49个。为了区分这两种类型的碎片，使用分段时发生的那种碎片被称为外部碎片。
 
 
 Internal fragmentation is unfortunate but often better than the external fragmentation that occurs with segmentation. It still wastes memory, but does not require defragmentation and makes the amount of fragmentation predictable (on average half a page per memory region).
@@ -151,11 +151,11 @@ For our above example, the page tables would look like this:
 
 We see that each program instance has its own page table. A pointer to the currently active table is stored in a special CPU register. On `x86`, this register is called `CR3`. It is the job of the operating system to load this register with the pointer to the correct page table before running each program instance.
 
-我们看到，每个程序实例都有自己的页表。一个指向当前活动表的指针被存储在一个特殊的CPU寄存器中。在`X86`上，这个寄存器被称为`CR3`。操作系统的工作是在运行每个程序实例之前加载这个含有正确页面指针的寄存器。
+我们看到，每个程序实例都有自己的页表。一个指向当前活动表的指针被存储在一个特殊的CPU寄存器中。在`X86`上，这个寄存器被称为`CR3`。操作系统的工作是在运行每个程序实例之前加载这个含有正确页表指针的寄存器。
 
 On each memory access, the CPU reads the table pointer from the register and looks up the mapped frame for the accessed page in the table. This is entirely done in hardware and completely invisible to the running program. To speed up the translation process, many CPU architectures have a special cache that remembers the results of the last translations.
 
-在每次内存访问时，CPU从寄存器中读取表的指针，并在表中查找被访问页面的映射帧。这完全是在硬件中完成的，对运行中的程序来说完全不可见。为了加快翻译过程，许多CPU架构有一个特殊的缓存，可以记住最后一次翻译的结果。
+在每次内存访问时，CPU从寄存器中读取表的指针，并在表中查找被访问页的映射帧。这完全是在硬件中完成的，对运行中的程序来说完全不可见。为了加快转换过程，许多CPU架构有一个特殊的缓存，可以记住最后一次转换的结果。
 
 Depending on the architecture, page table entries can also store attributes such as access permissions in a flags field. In the above example, the “r/w” flag makes the page both readable and writable.
 
@@ -174,7 +174,7 @@ The simple page tables we just saw have a problem in larger address spaces: they
 
 It only needs 4 physical frames, but the page table has over a million entries. We can’t omit the empty entries because then the CPU would no longer be able to jump directly to the correct entry in the translation process (e.g., it is no longer guaranteed that the fourth page uses the fourth entry).
 
-它只需要4个物理帧，但页表有超过一百万个条目。我们不能省略空条目，因为那样的话，CPU将不再能够在翻译过程中直接跳到正确的条目（例如，不再保证第四页使用第四条）（通过index寻址的 省略就不对了）。
+它只需要4个物理帧，但页表有超过一百万个条目。我们不能省略空条目，因为那样的话，CPU将不再能够在转换过程中直接跳到正确的条目（例如，不再保证第四页使用第四条）（通过index寻址的 省略就不对了）。
 
 To reduce the wasted memory, we can use a **two-level page table**. The idea is that we use different page tables for different address regions. An additional table called level 2 page table contains the mapping between address regions and (level 1) page tables.
 
@@ -193,7 +193,7 @@ Page 0 falls into the first `10_000` byte region, so it uses the first entry of 
 
 The pages `1_000_000`, `1_000_050`, and `1_000_100` all fall into the 100th `10_000` byte region, so they use the 100th entry of the level 2 page table. This entry points to a different level 1 page table T2, which maps the three pages to frames `100`, `150`, and `200`. Note that the page address in level 1 tables does not include the region offset. For example, the entry for page `1_000_050` is just 50.
 
-`1_000_000`、`1_000_050`和`1_000_100`页都属于第100个`10_000`字节区域，所以它们使用第二级页表的第100个条目。这个条目指向一个不同的1级页表T2，它将这三个页映射到帧`100`、`150`和`200`。注意，1级表中的页面地址不包括区域(段)偏移。例如，`1_000_050`页的条目只有`50`。
+`1_000_000`、`1_000_050`和`1_000_100`页都属于第100个`10_000`字节区域，所以它们使用第二级页表的第100个条目。这个条目指向一个不同的1级页表T2，它将这三个页映射到帧`100`、`150`和`200`。注意，1级表中的页地址不包括区域(段)偏移。例如，`1_000_050`页的条目只有`50`。
 
 We still have 100 empty entries in the level 2 table, but much fewer than the million empty entries before. The reason for these savings is that we don’t need to create level 1 page tables for the unmapped memory regions between `10_000` and `1_000_000`.
 
@@ -212,7 +212,7 @@ Now that we know how paging and multilevel page tables work, we can look at how 
 
 The x86_64 architecture uses a 4-level page table and a page size of 4 KiB. Each page table, independent of the level, has a fixed size of 512 entries. Each entry has a size of 8 bytes, so each table is 512 * 8 B = 4 KiB large and thus fits exactly into one page.
 
-x86_64架构使用一个4级页表，页大小为4KiB。每个页表，与级别无关，都有固定的512个条目。每个条目的大小为8字节，所以每个表的大小为512 * 8 B = 4 KiB，因此正好适合于一个页面。
+x86_64架构使用一个4级页表，页大小为4KiB。每个页表，与级别无关，都有固定的512个条目。每个条目的大小为8字节，所以每个表的大小为512 * 8 B = 4 KiB，因此正好适合于一个页。
 
 
 The page table index for each level is derived directly from the virtual address:
@@ -224,7 +224,7 @@ The page table index for each level is derived directly from the virtual address
 
 We see that each table index consists of 9 bits, which makes sense because each table has 2^9 = 512 entries. The lowest 12 bits are the offset in the 4 KiB page (2^12 bytes = 4 KiB). Bits 48 to 64 are discarded, which means that x86_64 is not really 64-bit since it only supports 48-bit addresses.
 
-我们看到每个表的索引由9位组成，这很合理，因为每个表有2^9=512个条目。最低的12位是4KiB页面中的偏移量（2^12字节=4KiB）。第48到64位被忽略，这意味着x86_64不是真正的64位，因为它只支持48位地址。
+我们看到每个表的索引由9位组成，这很合理，因为每个表有2^9=512个条目。最低的12位是4KiB页中的偏移量（2^12字节=4KiB）。第48到64位被忽略，这意味着x86_64不是真正的64位，因为它只支持48位地址。
 
 Even though bits 48 to 64 are discarded, they can’t be set to arbitrary values. Instead, all bits in this range have to be copies of bit 47 in order to keep addresses unique and allow future extensions like the 5-level page table. This is called sign-extension because it’s very similar to the [sign extension in two’s complement](https://en.wikipedia.org/wiki/Two's_complement#Sign_extension). When an address is not correctly sign-extended, the CPU throws an exception.
 
@@ -251,7 +251,7 @@ The physical address of the currently active level 4 page table, which is the ro
 
 The above page table hierarchy maps two pages (in blue). From the page table indices, we can deduce that the virtual addresses of these two pages are `0x803FE7F000` and `0x803FE00000`. Let’s see what happens when the program tries to read from address `0x803FE7F5CE`. First, we convert the address to binary and determine the page table indices and the page offset for the address:
 
-上面的页面表层次结构映射了两个页面（蓝色）。从页表索引中，我们可以推断出这两个页的虚拟地址为`0x803FE7F000`和`0x803FE00000`。现在，让我们看看当程序尝试读取地址`0x803FE7F5CE`时会发生什么。首先，我们将地址转换为二进制，并确定该地址的页表索引和页偏移量：
+上面的页表层次结构映射了两个页（蓝色）。从页表索引中，我们可以推断出这两个页的虚拟地址为`0x803FE7F000`和`0x803FE00000`。现在，让我们看看当程序尝试读取地址`0x803FE7F5CE`时会发生什么。首先，我们将地址转换为二进制，并确定该地址的页表索引和页偏移量：
 
 
 <img src="./img/x86_64-page-table-translation-addresses.png">
@@ -271,8 +271,8 @@ With these indices, we can now walk the page table hierarchy to determine the ma
 - 4级页表索引为1，于是我们查看表中索引为1的条目，该条目告诉我们3级页表存储在地址16KiB中。
 - 我们从该地址加载3级表，然后查看索引为0的条目，该条目告诉我们2级页表存储在地址24KiB中。
 - 2级页表的索引为511，于是我们查看该表的最后一个条目，以查找1级表的地址。
-- 通过1级页表中索引为127的条目，最终找到页面映射到12KiB帧，即十六进制的0x3000。
-- 最后一步，将页面偏移量添加到帧地址上，获取的物理地址为0x3000 + 0x5ce = 0x35ce。
+- 通过1级页表中索引为127的条目，最终找到页映射到12KiB帧，即十六进制的0x3000。
+- 最后一步，将页偏移量添加到帧地址上，获取的物理地址为0x3000 + 0x5ce = 0x35ce。
 
 
 <img src="./img/x86_64-page-table-translation-steps.svg">
@@ -281,7 +281,7 @@ With these indices, we can now walk the page table hierarchy to determine the ma
 The permissions for the page in the level 1 table are `r`, which means read-only. The hardware enforces these permissions and would throw an exception if we tried to write to that page. Permissions in higher level pages restrict the possible permissions in lower levels, so if we set the level 3 entry to read-only, no pages that use this entry can be writable, even if lower levels specify read/write permissions.
 
 
-1级页表中页面的权限为`r`，即只读。硬件会强制执行这些权限，如果我们尝试对该页写入，将会引发异常。较高级别页中的权限限制了较低级别中的可能权限，因此，如果我们将3级页表中的条目设置为只读，则即使较低级页指定了读/写权限，使用该条目的页也将无法执行写入。
+1级页表中页的权限为`r`，即只读。硬件会强制执行这些权限，如果我们尝试对该页写入，将会引发异常。较高级别页中的权限限制了较低级别中的可能权限，因此，如果我们将3级页表中的条目设置为只读，则即使较低级页指定了读/写权限，使用该条目的页也将无法执行写入。
 
 
 It’s important to note that even though this example used only a single instance of each table, there are typically multiple instances of each level in each address space. At maximum, there are:
@@ -353,13 +353,13 @@ Let’s take a closer look at the available flags:
 
 让我们仔细看看可用的标志：
 
-- `present`标志将被映射页面与未被映射页面区别开来。当主内存已满时，它可用于临时将页面换出到磁盘。当随后访问到该页面时，将会发生称为页错误的特殊异常，操作系统将对此做出反应——从磁盘重新加载缺失的页面——然后继续执行程序。
-- `writable`和`no execute`标志分别控制页面的内容是可写，还是包含可执行指令。
-- 当对页面被读取或写入时，CPU会自动设置`accessed`或`dirty`标志。该信息可以被操作系统利用，例如，在决定换出哪些页面时，或者确定自上次保存到磁盘以来内容是否已被修改。
-- `write through caching`和`disable cache`标志允许控制每个页面的缓存。
-- `user accessible`标志使页面可用于用户空间代码，否则仅当CPU处于内核模式时才可被访问。该特性使得CPU可以在运行用户空间程序时保持内核映射，该功能用于加快[系统调用](https://en.wikipedia.org/wiki/System_call)的速度。但是，[Spectre](https://en.wikipedia.org/wiki/Spectre_(security_vulnerability))漏洞仍然能够允许用户空间程序读取这些页面。
+- `present`标志将被映射页与未被映射页区别开来。当主内存已满时，它可用于临时将页换出到磁盘。当随后访问到该页时，将会发生称为页错误的特殊异常，操作系统将对此做出反应——从磁盘重新加载缺失的页——然后继续执行程序。
+- `writable`和`no execute`标志分别控制页的内容是可写，还是包含可执行指令。
+- 当对页被读取或写入时，CPU会自动设置`accessed`或`dirty`标志。该信息可以被操作系统利用，例如，在决定换出哪些页时，或者确定自上次保存到磁盘以来内容是否已被修改。
+- `write through caching`和`disable cache`标志允许控制每个页的缓存。
+- `user accessible`标志使页可用于用户空间代码，否则仅当CPU处于内核模式时才可被访问。该特性使得CPU可以在运行用户空间程序时保持内核映射，该功能用于加快[系统调用](https://en.wikipedia.org/wiki/System_call)的速度。但是，[Spectre](https://en.wikipedia.org/wiki/Spectre_(security_vulnerability))漏洞仍然能够允许用户空间程序读取这些页。
 - `global`标志向硬件发出信号，表明该页在所有地址空间中都可用，因此不需要在地址空间切换时将其从转换缓存中删除（请参阅下文中有关TLB的部分）。该标志通常与被置为0的`user accessible`标志一起使用，用以将内核代码映射到所有地址空间。
-- `huge page`标志允许通过使2级或3级页表的条目直接指向映射的帧，来创建更大尺寸的页。设置此位后，对于第2级条目，页面大小将增加512倍，达到2MiB = 512 * 4KiB，对于第3级条目，甚至能够达到1GiB = 512 * 2MiB。使用较大页面的优点是需要更少的地址转换缓存行和更少的页表。
+- `huge page`标志允许通过使2级或3级页表的条目直接指向映射的帧，来创建更大尺寸的页。设置此位后，对于第2级条目，页大小将增加512倍，达到2MiB = 512 * 4KiB，对于第3级条目，甚至能够达到1GiB = 512 * 2MiB。使用较大页的优点是需要更少的地址转换缓存行和更少的页表。
 
 
 
@@ -398,7 +398,7 @@ This means that every memory address that we used in our kernel was a virtual ad
 
 Paging makes our kernel already relatively safe, since every memory access that is out of bounds causes a page fault exception instead of writing to random physical memory. The bootloader even sets the correct access permissions for each page, which means that only the pages containing code are executable and only data pages are writable.
 
-分页使我们的内核已经相对安全了，因为每一次内存访问出界都会导致一个页故障异常，而不是写到随机的物理内存。Bootloader甚至为每个页面设置了正确的访问权限，这意味着只有包含代码的页面是可执行的，只有数据页面是可写的。
+分页使我们的内核已经相对安全了，因为每一次内存访问出界都会导致一个页故障异常，而不是写到随机的物理内存。Bootloader甚至为每个页设置了正确的访问权限，这意味着只有包含代码的页是可执行的，只有数据页是可写的。
 
 <h3>Page Faults</h3>
 
@@ -475,7 +475,7 @@ pub extern "C" fn _start() -> ! {
 
 When we run it, we see that our page fault handler is called:
 
-运行内核，可以看到页面错误处理程序被调用：
+运行内核，可以看到页错误处理程序被调用：
 
 
 <img src="./img/qemu-page-fault.png">
@@ -510,7 +510,7 @@ println!("write worked");
 
 By commenting out the last line, we see that the read access works, but the write access causes a page fault:
 
-可以看到读取访问有效，但是写入访问导致页面错误：
+可以看到读取访问有效，但是写入访问导致页错误：
 
 
 <img src="./img/qemu/../qemu-page-fault-protection.png">
@@ -575,11 +575,11 @@ Solutions to this problem are explained in detail in the next post.
 
 This post introduced two memory protection techniques: segmentation and paging. While the former uses variable-sized memory regions and suffers from external fragmentation, the latter uses fixed-sized pages and allows much more fine-grained control over access permissions.
 
-本文介绍了两种内存保护技术：分段和分页。前者使用可变大小的内存区域但存在外部碎片的问题，而后者使用固定大小的页面同时允许对访问权限进行更细粒度的控制。
+本文介绍了两种内存保护技术：分段和分页。前者使用可变大小的内存区域但存在外部碎片的问题，而后者使用固定大小的页同时允许对访问权限进行更细粒度的控制。
 
 Paging stores the mapping information for pages in page tables with one or more levels. The x86_64 architecture uses 4-level page tables and a page size of 4 KiB. The hardware automatically walks the page tables and caches the resulting translations in the translation lookaside buffer (TLB). This buffer is not updated transparently and needs to be flushed manually on page table changes.
 
-分页将页面的映射信息存储在具有一级或多级页表中。x86_64架构使用4级页表，页面大小为4KiB。硬件会自动遍历页表，并将生成的地址转换缓存在转换缓冲区（TLB）中。此缓冲区不是透明更新的，需要在页表更改时手动刷新。
+分页将页的映射信息存储在具有一级或多级页表中。x86_64架构使用4级页表，页大小为4KiB。硬件会自动遍历页表，并将生成的地址转换缓存在转换缓冲区（TLB）中。此缓冲区不是透明更新的，需要在页表更改时手动刷新。
 
 We learned that our kernel already runs on top of paging and that illegal memory accesses cause page fault exceptions. We tried to access the currently active page tables, but we weren’t able to do it because the CR3 register stores a physical address that we can’t access directly from our kernel.
 
