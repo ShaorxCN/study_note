@@ -23,6 +23,21 @@ pub extern "C" fn _start() -> ! {
 
     // stack_overflow();
 
+    // 地址位之前执行异常中展示的写操作地址 所以必定是code page
+    // let ptr = 0x2031d3 as *mut u32;
+    // unsafe{let x = *ptr;}
+    // println!("read works");
+
+    // unsafe{*ptr = 42;}
+    // println!("write works");
+
+    use x86_64::registers::control::Cr3; // Cr3 存储存储四级表地址
+    let (level_4_page_table, _) = Cr3::read();
+    println!(
+        "level 4 page table at:{:?}",
+        level_4_page_table.start_address()
+    );
+
     #[cfg(test)]
     test_main();
 

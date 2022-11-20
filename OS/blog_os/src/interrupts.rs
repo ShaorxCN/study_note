@@ -1,9 +1,11 @@
 use crate::gdt;
+use crate::hlt_loop;
 use crate::print;
 use crate::println;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use spin;
+use x86_64::structures::idt::PageFaultErrorCode;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 pub const PIC_1_OFFSET: u8 = 32; // 主控制器  命令和数据端口 分别 0x20 0x21   line0 timer
@@ -24,7 +26,7 @@ lazy_static! {
         }
         idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
-
+        idt.page_fault.set_handler_fn(page_fault_handler);
 
         idt
     };
@@ -103,6 +105,20 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
+}
+
+extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: PageFaultErrorCode,
+) {
+    // Cr2 中包含导致页错误的线性地址/虚拟地址
+    use x86_64::registers::control::Cr2;
+
+    println!("EXCEPTION:PAGE FAULT");
+    println!("Accesssed Address:{:?}", Cr2::read());
+    println!("Error Code:{:?}", error_code);
+    println!("{:#?}", stack_frame);
+    hlt_loop();
 }
 
 #[test_case]
