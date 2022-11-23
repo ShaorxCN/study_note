@@ -924,7 +924,7 @@ As expected, the translations of `0xb8000` and the code and stack addresses stay
 
 和预期得一样，`0xb8000`、代码地址和栈地址的转换结果与我们自己实现的转换函数相同。此外，我们现在看到虚拟地址`physical_memory_offset`映射到物理地址`0x0`。
 
-By using the translation function of the `MappedPageTable` type, we can spare ourselves the work of implementing huge page support. We also have access to other page functions, such as `map_to`, which we will use in the next section.
+By using the translation function of the `MappedPageTable`(`OffsetPageTable`?) type, we can spare ourselves the work of implementing huge page support. We also have access to other page functions, such as `map_to`, which we will use in the next section.
 
 通过使用`MappedPageTable`类型的转换功能，我们就没必要自己实现对巨页的支持了。另外，还可以访问其他页面函数,如`map_to`,我们将在下一节中使用。
 
