@@ -943,7 +943,7 @@ Until now, we only looked at the page tables without modifying anything. Let’s
 We will use the [map_to](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#method.map_to) function of the [Mapper](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html) trait for our implementation, so let’s take a look at that function first. The documentation tells us that it takes four arguments: the page that we want to map, the frame that the page should be mapped to, a set of flags for the page table entry, and a `frame_allocator`. The frame allocator is needed because mapping the given page might require creating additional page tables, which need unused frames as backing storage.
 
 
-该操作将使用[Mapper](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html) trait的[map_to](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#method.map_to)函数来实现，让我们首先看一下这个函数。文档说明该函数有四个参数，分别是：想要映射的页面，该页面应映射到的帧，为该页表项设置的标志，以及`frame_allocator`。这里需要`frame_allocator，是因为映射给定页面时，可能需要创建新的页表，而这个过程需要给新页表分配未使用的帧。
+该操作将使用[Mapper](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html) trait的[map_to](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#method.map_to)函数来实现，让我们首先看一下这个函数。文档说明该函数有四个参数，分别是：想要映射的页面，该页面应映射到的帧，为该页表项设置的标志，以及`frame_allocator`。这里需要`frame_allocator`，是因为映射给定页面时，可能需要创建新的页表，而这个过程需要给新页表分配未使用的帧。
 
 
 #### A `create_example_mapping` Function(一个`create_example_mapping`函数)
@@ -1332,4 +1332,4 @@ We can’t map the physical memory from our kernel without page table access, so
 
 For our implementation, we first manually traversed the page tables to implement a translation function, and then used the `MappedPageTable` type of the `x86_64` crate. We also learned how to create new mappings in the page table and how to create the necessary `FrameAllocator` on top of the memory map passed by the bootloader.
 
-在代码实现的过程中，我们首先通过手动遍历页表的方式实现了地址转换函数，然后转而使用`x86_64`包的`MappedPageTable`类型代替我们手写的代码。此外，我们还学习了如何在页表中创建新的映射，以及如何在bootloader传入的内存映射之上创建必要的`FrameAllocator`。
+在代码实现的过程中，我们首先通过手动遍历页表的方式实现了地址转换函数，然后转而使用`x86_64`包的`MappedPageTable(OffsetPageTable?)`类型代替我们手写的代码。此外，我们还学习了如何在页表中创建新的映射，以及如何在bootloader传入的内存映射之上创建必要的`FrameAllocator`。
