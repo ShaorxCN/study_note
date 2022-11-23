@@ -47,7 +47,8 @@ So in order to access page table frames, we need to map some virtual pages to th
 
 <h3>Identity Mapping(直接(恒等)映射)</h3>
 
-A simple solution is to identity map all page tables:
+A simple solution is to **identity map all page tables**:
+
 一个简单的方法就是**恒等映射所有的页表**:
 
 <img src="./img/identity-mapped-page-tables.svg">
@@ -60,7 +61,7 @@ In this example, we see various identity-mapped page table frames. This way, the
 However, it clutters the virtual address space and makes it more difficult to find continuous memory regions of larger sizes. For example, imagine that we want to create a virtual memory region of size 1000 KiB in the above graphic, e.g., for [memory-mapping a file](https://en.wikipedia.org/wiki/Memory-mapped_file). We can’t start the region at `28 KiB` because it would collide with the already mapped page at `1004 KiB`. So we have to look further until we find a large enough unmapped area, for example at `1008 KiB`. This is a similar fragmentation problem as with [segmentation](https://os.phil-opp.com/paging-introduction/#fragmentation).
 
 
-然而这种方法会使虚拟地址空间变得杂乱并且这样就很难找到连续的较大的内存空间。举个例子,想象下我们需要创建一个大小为1000KiB的内存区域，例如用来[映射文件](https://en.wikipedia.org/wiki/Memory-mapped_file).我们不能够从`28KiB`的区域开始，因为这样会导致和已经存在的映射的`1004KiB`冲突。
+然而这种方法会使虚拟地址空间变得杂乱并且这样就很难找到连续的较大的内存空间。举个例子,想象下我们需要创建一个大小为1000KiB的内存区域，例如用来[映射文件](https://en.wikipedia.org/wiki/Memory-mapped_file).我们不能够从`28KiB`的区域开始，因为这样会导致和已经存在映射的`1004KiB`冲突。
 所以我们需要继续去寻找一个足够大的未映射的内存区域。比如`1008 KiB`的位置。这样就和[分段](https://os.phil-opp.com/paging-introduction/#fragmentation)有类似的碎片问题了
 
 Equally, it makes it much more difficult to create new page tables because we need to find physical frames whose corresponding pages aren’t already in use. For example, let’s assume that we reserved the virtual `1000 KiB` memory region starting at `1008 KiB` for our memory-mapped file. Now we can’t use any frame with a physical address between `1000 KiB` and `2008 KiB` anymore, because we can’t identity map it.
@@ -71,7 +72,7 @@ Equally, it makes it much more difficult to create new page tables because we ne
 
 To avoid the problem of cluttering the virtual address space, we can use a separate memory region for page table mappings. So instead of identity mapping page table frames, we map them at a fixed offset in the virtual address space. For example, the offset could be 10 TiB:
 
-为了避免上面说的将虚拟内存空间混乱的问题，我们可以划分一个单独的区域来存储页表。所以替代恒等映射，我们将页表映射到虚拟地址空间中一个固定偏移后开始的地方。举个例子，这个偏移量时 10 TiB(类似虚拟地址= 物理地址+10TiB):
+为了避免上面说的将虚拟内存空间混乱的问题，我们可以划分一个单独的区域来存储页表。所以替代恒等映射，我们将页表映射到虚拟地址空间中一个固定偏移后开始的地方。举个例子，这个偏移量是10TiB(类似虚拟地址= 物理地址+10TiB):
 
 
 <img src="./img/page-tables-mapped-at-offset.svg">
@@ -86,7 +87,7 @@ This approach still has the disadvantage that we need to create a new mapping wh
 
 该方法仍然有一个缺点，就是每当我们创建一个新的页表时，都需要创建一个新的映射。另外，该方法不允许访问其他地址空间的页表，这在创建新进程时很有用。
 
-<h3>Map the Complete Physical Memory(物理空间完全映射)</h3>
+<h3>Map the Complete Physical Memory(物理内存完全映射)</h3>
 
 We can solve these problems by **mapping the complete physical memory** instead of only page table frames:
 
@@ -97,7 +98,7 @@ We can solve these problems by **mapping the complete physical memory** instead 
 
 This approach allows our kernel to access arbitrary physical memory, including page table frames of other address spaces. The reserved virtual memory range has the same size as before, with the difference that it no longer contains unmapped pages.
 
-这种方法允许内核访问任意物理内存，包括其他地址空间的页表帧。保留的虚拟内存范围与上一节相同，不同之处在于虚拟内存不再包含未映射的页面（译注：即虚拟内存空间将全部映射到物理帧）。
+这种方法允许内核访问任意物理内存，包括其他地址空间的页表帧。保留的虚拟内存范围与上一节相同，不同之处在于虚拟内存不再包含未映射的页面（即虚拟内存空间将全部映射到物理帧）。
 
 
 The disadvantage of this approach is that additional page tables are needed for storing the mapping of the physical memory. These page tables need to be stored somewhere, so they use up a part of physical memory, which can be a problem on devices with a small amount of memory.
@@ -107,7 +108,7 @@ The disadvantage of this approach is that additional page tables are needed for 
 
 On x86_64, however, we can use [huge pages](https://en.wikipedia.org/wiki/Page_%28computer_memory%29#Multiple_page_sizes) with a size of 2 MiB for the mapping, instead of the default 4 KiB pages. This way, mapping 32 GiB of physical memory only requires 132 KiB for page tables since only one level 3 table and 32 level 2 tables are needed. Huge pages are also more cache efficient since they use fewer entries in the translation lookaside buffer (TLB).
 
-不过，在x86_64上我们可以使用2MiB的[巨页](https://en.wikipedia.org/wiki/Page_%28computer_memory%29#Multiple_page_sizes)进行映射，而不是默认的4KiB页面。这样，映射32GiB内存，仅需要1个3级表和32个2级表（2级:512*2MB=1G  三级表32个就够了 2级直接映射物理帧 原来的1级扩展为偏移）总共132KiB的空间用于存储页表（(1+32)*4KiB=132KiB）。而且巨页还可以提升缓存效率，因为巨页在转换后备缓冲区（TLB）中使用的条目更少。
+不过，在x86_64上我们可以使用2MiB的[巨页](https://en.wikipedia.org/wiki/Page_%28computer_memory%29#Multiple_page_sizes)进行映射，而不是默认的4KiB页面。这样，映射32GiB内存，仅需要1个3级表和32个2级表（2级:512*2MB=1G  三级表32个就够了 2级直接映射物理帧 原来的1级扩展为偏移）总共132KiB的空间用于存储页表（(1+32)*4KiB=132KiB）。而且巨页还可以提升缓存效率，因为巨页在页表缓冲区（TLB）中使用的条目更少。
 
 <h3>Temporary Mapping(临时映射)</h3>
 
@@ -134,8 +135,8 @@ By writing to the identity-mapped level 1 table, our kernel can create up to 511
 
 通过写入恒等映射的1级表，我们的内核最多可以创建511个临时映射（512减去恒等映射所需的条目（自己的恒等））。在上面的示例中，内核创建了两个临时映射：
 
-- 将1级表的第0个条目映射到地址为24KiB的帧，便创建了一个虚拟的临时映射，将0​​KiB处的虚拟页映射到2级页表所在的物理帧，如虚线箭头所示。
-- 将1级表的第9个条目映射到地址为4KiB的帧，便创建了一个虚拟的临时映射，将36KiB处的虚拟页映射到4级页表所在的物理帧，如虚线箭头所示。
+- 将1级表的第0个条目映射到地址为24KiB的帧，便创建了一个临时映射，将0​​KiB处的虚拟页映射到2级页表所在的物理帧，如虚线箭头所示。
+- 将1级表的第9个条目映射到地址为4KiB的帧，便创建了一个临时映射，将36KiB处的虚拟页映射到4级页表所在的物理帧，如虚线箭头所示。
 
 Now the kernel can access the level 2 page table by writing to page `0 KiB` and the level 4 page table by writing to page `36 KiB`.
 
@@ -277,7 +278,7 @@ We can now calculate virtual addresses for the page tables of all four levels. W
 
 Whereas `AAA` is the level 4 index, `BBB` the level 3 index, `CCC` the level 2 index, and `DDD` the level 1 index of the mapped frame, and `EEEE` the offset into it. `RRR` is the index of the recursive entry. When an index (three digits) is transformed to an offset (four digits), it is done by multiplying it by 8 (the size of a page table entry). With this offset, the resulting address directly points to the respective page table entry.
 
-其中`AAA`是4级索引，`BBB`是3级索引，`CCC`是2级索引，`DDD`是映射帧的1级索引，而`EEEE`是映射帧的偏移量。`RRR`是递归条目的索引。当索引（三位数）转换为偏移量（四位数，译注：12位二进制偏移地址转换为4位八进制数）时，可以通过将其乘以8（页表项的大小,8byte）来完成。有了这样的偏移量，结果地址就直接指向相应的页表条目。
+其中`AAA`是4级索引，`BBB`是3级索引，`CCC`是2级索引，`DDD`是映射帧的1级索引，而`EEEE`是映射帧的偏移量。`RRR`是递归条目的索引。当索引（三位数）转换为偏移量（四位数，12位二进制偏移地址转换为4位八进制数）时，可以通过将其乘以8（页表项的大小,8byte）来完成。有了这样的偏移量，结果地址就直接指向相应的页表条目。
 
 
 `SSSSSS` are sign extension bits, which means that they are all copies of bit 47. This is a special requirement for valid addresses on the x86_64 architecture. We explained it in the [previous post](https://os.phil-opp.com/paging-introduction/#paging-on-x86-64).
@@ -378,7 +379,7 @@ However, it also has some disadvantages:
 
 然而，他也有一些缺点:
 
-- 它占据了大量的虚拟内存（512GiB 对应一个完整的3j空间  4KiB*512*512*512）。这在大的48位地址空间中不是一个大问题，但它可能会导致次优的缓存行为。
+- 它占据了大量的虚拟内存（512GiB 对应一个完整的3j空间  4KiB * 512 * 512 * 512）。这在大的48位地址空间中不是一个大问题，但它可能会导致次优的缓存行为。
 - 该方法仅允许轻松地访问当前活动的地址空间。当然通过更改递归项，仍然可以访问其他地址空间，但是需要临时映射才能切换回去。我们在[重新映射内核](https://os.phil-opp.com/remap-the-kernel/#overview)（已过时）一文中描述了如何执行此操作。
 - 十分依赖x86的页表格式，可能无法在其他架构中运行。
 
@@ -824,8 +825,8 @@ Translating virtual to physical addresses is a common task in an OS kernel, ther
 
 At the basis of the abstraction are two traits that define various page table mapping functions:
 
-- The [Mapper](The Mapper trait is generic over the page size and provides functions that operate on pages. Examples are [translate_page](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#tymethod.translate_page), which translates a given page to a frame of the same size, and [map_to](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#method.map_to), which creates a new mapping in the page table.
-The Translate trait provides functions that work with multiple page sizes, such as translate_addr or the general translate.) trait is generic over the page size and provides functions that operate on pages. Examples are `translate_page`, which translates a given page to a frame of the same size, and `map_to`, which creates a new mapping in the page table.
+- The [Mapper](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html) trait is generic over the page size and provides functions that operate on pages. Examples are [translate_page](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#tymethod.translate_page), which translates a given page to a frame of the same size, and [map_to](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#method.map_to), which creates a new mapping in the page table.
+
 - The [Translate](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Translate.html) trait provides functions that work with multiple page sizes, such as [translate_addr](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Translate.html#method.translate_addr) or the general [translate](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Translate.html).
 
 
@@ -868,7 +869,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr)
 
 The function takes the `physical_memory_offset` as an argument and returns a new `OffsetPageTable` instance with a `'static` lifetime. This means that the instance stays valid for the complete runtime of our kernel. In the function body, we first call the `active_level_4_table` function to retrieve a mutable reference to the level 4 page table. We then invoke the [OffsetPageTable::new](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.OffsetPageTable.html#method.new) function with this reference. As the second parameter, the `new` function expects the virtual address at which the mapping of the physical memory starts, which is given in the `physical_memory_offset` variable.
 
-该函数将`physical_memory_offse`t作为参数，新建并返回一个具有`'static`生命周期的`OffsetPageTable`实例。这意味着该实例在内核运行时始终保持有效。在函数主体中，我们首先调用`active_level_4_table`函数获取4级页表的可变引用。然后，我们将此引用作为第一个参数传递给[OffsetPageTable::new](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.OffsetPageTable.html#method.new)函数。我们使用`physical_memory_offset`变量作为第二个参数传递给`new`函数，以传递虚拟地址映射到物理地址的起点。
+该函数将`physical_memory_offset`作为参数，新建并返回一个具有`'static`生命周期的`OffsetPageTable`实例。这意味着该实例在内核运行时始终保持有效。在函数主体中，我们首先调用`active_level_4_table`函数获取4级页表的可变引用。然后，我们将此引用作为第一个参数传递给[OffsetPageTable::new](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.OffsetPageTable.html#method.new)函数。我们使用`physical_memory_offset`变量作为第二个参数传递给`new`函数，以传递虚拟地址映射到物理地址的起点。
 
 The `active_level_4_table` function should only be called from the `init` function from now on because it can easily lead to aliased mutable references when called multiple times, which can cause undefined behavior. For this reason, we make the function private by removing the `pub` specifier.
 
