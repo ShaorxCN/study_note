@@ -15,6 +15,7 @@ x86_64 = "0.14.10"
 uart_16550 = "0.2.0"  # 串口通信实现内核向宿主系统发送数据
 pic8259="0.10.2"    # 中断控制器
 pc-keyboard="0.5.0" # 键盘scancode 转义
+linked_list_allocator = "0.10.4"
 
 [dependencies.lazy_static]
 version = "1.0"

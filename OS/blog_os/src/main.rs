@@ -2,7 +2,8 @@
 #![no_main]
 #![feature(custom_test_frameworks)]
 #![test_runner(blog_os::test_runner)] // 指定自定义测试框架的test_runner
-#![reexport_test_harness_main = "test_main"] // 自定义测试框架默认是生成一个main函来调用 test_runner  这里重定义了调用名 然后_start里调用test_main
+#![reexport_test_harness_main = "test_main"]
+// 自定义测试框架默认是生成一个main函来调用 test_runner  这里重定义了调用名 然后_start里调用test_main
 use blog_os::{
     memory::{self, translation_addr, BootInfoFrameAllocator},
     println,
@@ -13,6 +14,8 @@ use x86_64::{
     structures::paging::{FrameAllocator, Page, PageTable, Translate},
     VirtAddr,
 };
+extern crate alloc;
+use alloc::{boxed::Box, rc::Rc,vec, vec::Vec};
 
 // 在底层定义了_start入口点 所以下面的#[no_mangle]和命名不重要了
 // 并且对签名进行了检查
@@ -77,39 +80,69 @@ pub fn kernel_main(boot_info: &'static BootInfo) -> ! {
     //     }
     // }
 
+    // let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    // let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    // let address = [
+    //     // VGA 直接映射  0xb8000
+    //     0xb8000,
+    //     // 某代码页
+    //     0x201008,
+    //     // 某栈页
+    //     0x0100_0020_1a10,
+    //     // 0 huge page
+    //     boot_info.physical_memory_offset,
+    // ];
+
+    // for &address in &address {
+    //     let virt = VirtAddr::new(address);
+    //     // let phys = unsafe{translation_addr(virt, phys_mem_offset)};
+    //     // 使用x86_64提供的功能转换
+    //     let phys = mapper.translate_addr(virt);
+    //     println!("{:?} -> {:?}", virt, phys);
+    // }
+
+    // // let mut frame_allocator = memory::EmptyFrameAllocator;
+    // let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
+
+    // // bootloader 会将自身映射到虚拟空间的第一个兆字节 且为为映射状态 这样说明l1已经存在 那么就不需要申请新的帧创建l1
+    // // 返回None的EmptyFrameAllocator也就没关系
+    // let page = Page::containing_address(VirtAddr::new(0));
+    // memory::create_example_mapping(page, &mut mapper, &mut frame_allocator);
+
+    // let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
+    // unsafe {
+    //     page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);
+    // }
+    use blog_os::allocator;
+    use blog_os::memory::{self, BootInfoFrameAllocator};
+
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let address = [
-        // VGA 直接映射  0xb8000
-        0xb8000,
-        // 某代码页
-        0x201008,
-        // 某栈页
-        0x0100_0020_1a10,
-        // 0 huge page
-        boot_info.physical_memory_offset,
-    ];
-
-    for &address in &address {
-        let virt = VirtAddr::new(address);
-        // let phys = unsafe{translation_addr(virt, phys_mem_offset)};
-        // 使用x86_64提供的功能转换
-        let phys = mapper.translate_addr(virt);
-        println!("{:?} -> {:?}", virt, phys);
-    }
-
-    // let mut frame_allocator = memory::EmptyFrameAllocator;
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
 
-    // bootloader 会将自身映射到虚拟空间的第一个兆字节 且为为映射状态 这样说明l1已经存在 那么就不需要申请新的帧创建l1
-    // 返回None的EmptyFrameAllocator也就没关系
-    let page = Page::containing_address(VirtAddr::new(0));
-    memory::create_example_mapping(page, &mut mapper, &mut frame_allocator);
+    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap init failed");
 
-    let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
-    unsafe {
-        page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);
+    let heap_value = Box::new(41);
+    println!("heap_value at {:p}", heap_value);
+
+    let mut vec = Vec::new();
+    for i in 0..500 {
+        vec.push(i);
     }
+
+    println!("vec at {:p}", vec.as_slice());
+
+    let reference_counted = Rc::new(vec![1, 2, 3]);
+    let cloned_reference = reference_counted.clone();
+    println!(
+        "current reference count is {}",
+        Rc::strong_count(&cloned_reference)
+    );
+    core::mem::drop(reference_counted);
+    println!(
+        "reference count is {} now",
+        Rc::strong_count(&cloned_reference)
+    );
 
     #[cfg(test)]
     test_main();
