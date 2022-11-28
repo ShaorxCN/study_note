@@ -15,7 +15,7 @@ use x86_64::{
     VirtAddr,
 };
 extern crate alloc;
-use alloc::{boxed::Box, rc::Rc,vec, vec::Vec};
+use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
 
 // 在底层定义了_start入口点 所以下面的#[no_mangle]和命名不重要了
 // 并且对签名进行了检查

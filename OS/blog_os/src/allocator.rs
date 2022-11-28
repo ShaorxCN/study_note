@@ -7,8 +7,27 @@ use x86_64::{
     },
     VirtAddr,
 };
+
+use spin::Mutex;
+
+// use bump::BumpAllocator;
+
+// use linked_list::LinkedListAllocator;
+
+use fixed_size_block::FixedSizeBlockAllocator;
+
+// 线性分配器
+pub mod bump;
+
+// 链表分配器
+pub mod linked_list;
+
+// 块分配器
+pub mod fixed_size_block;
+
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
+// static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
 
 // pub struct Dummy;
 
@@ -49,7 +68,38 @@ pub fn init_heap(
         unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
     }
 
-    unsafe { ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE) }
+    unsafe { ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE) }
 
     Ok(())
+}
+
+pub struct Locked<A> {
+    inner: spin::Mutex<A>,
+}
+
+impl<A> Locked<A> {
+    pub const fn new(inner: A) -> Self {
+        Locked {
+            inner: spin::Mutex::new(inner),
+        }
+    }
+
+    pub fn lock(&self) -> spin::MutexGuard<A> {
+        self.inner.lock()
+    }
+}
+
+fn align_up(addr: usize, align: usize) -> usize {
+    // let remainder =  addr%align;
+
+    // if remainder == 0{
+    //     addr
+    // }else{
+    //     addr - remainder+align
+    // }
+    // 要求align是2的幂
+    // 因为是2的幂 所以只有1位是1 0b000100000 减一就是低位全变成1
+    // 取反 那就是只有低于原先数值位的是0  其他都是1
+    // 按位and 也就是向下对齐 也就是所有低于原值的位都变为0 然后 因为是addr+align-1 所以肯定是大于align的 且必然是倍数对齐(低位都是0 也就是没有余数)
+    (addr + align - 1) & !(align - 1)
 }
