@@ -21,6 +21,21 @@ linked_list_allocator = "0.10.4"
 version = "1.0"
 features = ["spin_no_std"]
 
+[dependencies.crossbeam-queue]
+version = "0.2.1"
+default-features = false  # 禁用默认特性 兼容[no_std]
+features = ["alloc"]
+
+
+[dependencies.conquer-once]
+version = "0.2.0"
+default-features = false
+
+[dependencies.futures-util]
+version = "0.3.4"
+default-features = false
+features = ["alloc"]
+
 
 [package.metadata.bootimage]
 build-command = ["xbuild"]

@@ -76,29 +76,36 @@ extern "x86-interrupt" fn double_fault_handler(
 }
 
 extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-    use spin::Mutex;
+    // use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+    // use spin::Mutex;
     use x86_64::instructions::port::Port;
+   
+    // lazy_static! {
+    //     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
+    //         Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore)
+    //     );
+    // }
 
-    lazy_static! {
-        static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
-            Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore)
-        );
-    }
+    // let mut keyboard = KEYBOARD.lock();
+    // let mut port = Port::new(0x60); // 读取scancode from PS/2 controller
+    // let scancode: u8 = unsafe { port.read() };
 
-    let mut keyboard = KEYBOARD.lock();
-    let mut port = Port::new(0x60); // 读取scancode from PS/2 controller
-    let scancode: u8 = unsafe { port.read() };
+    // if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+    //     if let Some(key) = keyboard.process_keyevent(key_event) {
+    //         match key {
+    //             DecodedKey::Unicode(character) => print!("{}", character),
+    //             DecodedKey::RawKey(key) => print!("{:?}", key),
+    //         }
+    //     }
+    // }
 
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::Unicode(character) => print!("{}", character),
-                DecodedKey::RawKey(key) => print!("{:?}", key),
-            }
-        }
-    }
+     // 异步代码代替原来逻辑
 
+     
+    
+     let mut port = Port::new(0x60); // 读取scancode from PS/2 controller
+     let scancode: u8 = unsafe { port.read() };
+     crate::task::keyboard::add_scancode(scancode);
     // EOI  end of interrupt 通知PIC已经处理完成可以发送下一个
     // unsafe 因为中断信号index的eoi危险 可能导致部分中断未处理完就下一个
     unsafe {

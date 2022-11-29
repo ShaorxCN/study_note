@@ -6,7 +6,7 @@
 // 自定义测试框架默认是生成一个main函来调用 test_runner  这里重定义了调用名 然后_start里调用test_main
 use blog_os::{
     memory::{self, translation_addr, BootInfoFrameAllocator},
-    println,
+    println, task::executor::Executor,
 };
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
@@ -14,9 +14,10 @@ use x86_64::{
     structures::paging::{FrameAllocator, Page, PageTable, Translate},
     VirtAddr,
 };
+use blog_os::task::keyboard;
 extern crate alloc;
 use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-
+use blog_os::task::Task;
 // 在底层定义了_start入口点 所以下面的#[no_mangle]和命名不重要了
 // 并且对签名进行了检查
 entry_point!(kernel_main);
@@ -122,33 +123,37 @@ pub fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap init failed");
 
-    let heap_value = Box::new(41);
-    println!("heap_value at {:p}", heap_value);
+    // let heap_value = Box::new(41);
+    // println!("heap_value at {:p}", heap_value);
 
-    let mut vec = Vec::new();
-    for i in 0..500 {
-        vec.push(i);
-    }
+    // let mut vec = Vec::new();
+    // for i in 0..500 {
+    //     vec.push(i);
+    // }
 
-    println!("vec at {:p}", vec.as_slice());
+    // println!("vec at {:p}", vec.as_slice());
 
-    let reference_counted = Rc::new(vec![1, 2, 3]);
-    let cloned_reference = reference_counted.clone();
-    println!(
-        "current reference count is {}",
-        Rc::strong_count(&cloned_reference)
-    );
-    core::mem::drop(reference_counted);
-    println!(
-        "reference count is {} now",
-        Rc::strong_count(&cloned_reference)
-    );
+    // let reference_counted = Rc::new(vec![1, 2, 3]);
+    // let cloned_reference = reference_counted.clone();
+    // println!(
+    //     "current reference count is {}",
+    //     Rc::strong_count(&cloned_reference)
+    // );
+    // core::mem::drop(reference_counted);
+    // println!(
+    //     "reference count is {} now",
+    //     Rc::strong_count(&cloned_reference)
+    // );
 
     #[cfg(test)]
     test_main();
-
     println!("it did not crash!");
-    blog_os::hlt_loop();
+    let mut executor  = Executor::new();
+    executor.spawn(Task::new(example_task()));
+    executor.spawn(Task::new(keyboard::print_keypresses()));
+    executor.run();
+
+
 }
 
 // ！返回 发散型函数 表示没有返回 后面如果有代码也不会执行 有的话编译也会提示unreachable
