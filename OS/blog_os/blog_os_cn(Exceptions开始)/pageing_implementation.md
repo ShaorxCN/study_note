@@ -108,7 +108,7 @@ The disadvantage of this approach is that additional page tables are needed for 
 
 On x86_64, however, we can use [huge pages](https://en.wikipedia.org/wiki/Page_%28computer_memory%29#Multiple_page_sizes) with a size of 2 MiB for the mapping, instead of the default 4 KiB pages. This way, mapping 32 GiB of physical memory only requires 132 KiB for page tables since only one level 3 table and 32 level 2 tables are needed. Huge pages are also more cache efficient since they use fewer entries in the translation lookaside buffer (TLB).
 
-不过，在x86_64上我们可以使用2MiB的[巨页](https://en.wikipedia.org/wiki/Page_%28computer_memory%29#Multiple_page_sizes)进行映射，而不是默认的4KiB页面。这样，映射32GiB内存，仅需要1个3级表和32个2级表（2级:512*2MB=1G  三级表32个就够了 2级直接映射物理帧 原来的1级扩展为偏移）总共132KiB的空间用于存储页表（(1+32)*4KiB=132KiB）。而且巨页还可以提升缓存效率，因为巨页在页表缓冲区（TLB）中使用的条目更少。
+不过，在x86_64上我们可以使用2MiB的[巨页](https://en.wikipedia.org/wiki/Page_%28computer_memory%29#Multiple_page_sizes)进行映射，而不是默认的4KiB页面。这样，映射32GiB内存，仅需要1个3级表和32个2级表（2级:512*2MB=1G  三级表32个就够了 2级直接映射物理帧 原来的1级扩展为偏移）总共132KiB的空间用于存储页表（(1+32)*4KiB=132KiB）。而且巨页还可以提升缓存效率，因为巨页在页表缓存区（TLB）中使用的条目更少。
 
 <h3>Temporary Mapping(临时映射)</h3>
 
@@ -999,7 +999,7 @@ In addition to the `page` and the `unused_frame`, the `map_to` method takes a se
 
 The `map_to` function can fail, so it returns a `Result`. Since this is just some example code that does not need to be robust, we just use `expect` to panic when an error occurs. On success, the function returns a [MapperFlush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html) type that provides an easy way to flush the newly mapped page from the translation lookaside buffer (TLB) with its [flush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html#method.flush) method. Like `Result`, the type uses the `#[must_use]` attribute to emit a warning when we accidentally forget to use it.
 
-`map_to`函数可能会失败，因此它将返回一个`Result`。这只是示例用代码，不需要很健壮，因此我们在发生panic时仅使用`expect`应付。调用成功时该函数将返回[MapperFlush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html)类型，该类型提供了一种调用其[flush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html#method.flush)方法,可从页表缓冲区（TLB）中刷新新映射页面的简便方法。像`Result`一样，该类型也使用`#[must_use]`属性在我们意外忘记调用`flush`方法时发出警告。
+`map_to`函数可能会失败，因此它将返回一个`Result`。这只是示例用代码，不需要很健壮，因此我们在发生panic时仅使用`expect`应付。调用成功时该函数将返回[MapperFlush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html)类型，该类型提供了一种调用其[flush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html#method.flush)方法,可从页表缓存区（TLB）中刷新新映射页面的简便方法。像`Result`一样，该类型也使用`#[must_use]`属性在我们意外忘记调用`flush`方法时发出警告。
 
 #### A dummy `FrameAllocator`(假的`FrameAllocator`)
 

@@ -579,7 +579,7 @@ This post introduced two memory protection techniques: segmentation and paging. 
 
 Paging stores the mapping information for pages in page tables with one or more levels. The x86_64 architecture uses 4-level page tables and a page size of 4 KiB. The hardware automatically walks the page tables and caches the resulting translations in the translation lookaside buffer (TLB). This buffer is not updated transparently and needs to be flushed manually on page table changes.
 
-分页将页的映射信息存储在具有一级或多级页表中。x86_64架构使用4级页表，页大小为4KiB。硬件会自动遍历页表，并将生成的地址转换缓存在转换缓冲区（TLB）中。此缓冲区不是透明更新的，需要在页表更改时手动刷新。
+分页将页的映射信息存储在具有一级或多级页表中。x86_64架构使用4级页表，页大小为4KiB。硬件会自动遍历页表，并将生成的地址转换缓存在页表转换缓存区（TLB）中。此缓存区不是透明更新的，需要在页表更改时手动刷新。
 
 We learned that our kernel already runs on top of paging and that illegal memory accesses cause page fault exceptions. We tried to access the currently active page tables, but we weren’t able to do it because the CR3 register stores a physical address that we can’t access directly from our kernel.
 
