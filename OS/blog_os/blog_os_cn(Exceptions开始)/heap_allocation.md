@@ -251,7 +251,7 @@ extern crate alloc;
 
 Contrary to normal dependencies, we don’t need to modify the `Cargo.toml`. The reason is that the `alloc` crate ships with the Rust compiler as part of the standard library, so the compiler already knows about the crate. By adding this `extern crate` statement, we specify that the compiler should try to include it. (Historically, all dependencies needed an `extern crate` statement, which is now optional).
 
-与添加普通依赖不同，我们并不需要修改`Cargo.toml`。原因是`alloc` crate与Rust编译器一起作为标准库的一部分供我们使用，因此编译器已经知道了该crate。通过添加此`extern crat`e语句，我们指定编译器去尝试包含该`crate`。（在以前的Rust中，所有依赖项都需要一个`extern crate`语句，不过现在该语句是可选的）。
+与添加普通依赖不同，我们并不需要修改`Cargo.toml`。原因是`alloc` crate与Rust编译器一起作为标准库的一部分供我们使用，因此编译器已经知道了该crate。通过添加此`extern crate`语句，我们指定编译器去尝试包含该`crate`。（在以前的Rust中，所有依赖项都需要一个`extern crate`语句，不过现在该语句是可选的）。
 
 Since we are compiling for a custom target, we can’t use the precompiled version of alloc that is shipped with the Rust installation. Instead, we have to tell cargo to recompile the crate from source. We can do that by adding it to the `unstable.build-std` array in our `.cargo/config.toml` file:
 
@@ -282,12 +282,12 @@ error: `#[alloc_error_handler]` function required, but not found
 
 The first error occurs because the `alloc` crate requires a heap allocator, which is an object that provides the `allocate` and `deallocate` functions. In Rust, heap allocators are described by the [GlobalAlloc](https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html) trait, which is mentioned in the error message. To set the heap allocator for the crate, the `#[global_allocator]` attribute must be applied to a static variable that implements the `GlobalAlloc` trait.
 
-第一个错误的发生是因为`alloc` crate需要一个堆分配器，这是一个提供`allocate`和`deallocate`函数的对象。在Rust中，堆分配器由[GlobalAlloc](https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html)trait描述，错误信息中提到了这个trait。我们可以通过将`#[global_allocator]`属性附在实现了`GlobalAlloc` trait的静态变量上来为`alloc` crate设置堆分配器。
+第一个错误的发生是因为`alloc` crate需要一个堆分配器，这是一个提供`allocate`和`deallocate`函数的对象。在Rust中，堆分配器由[GlobalAlloc](https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html) trait描述，错误信息中提到了这个trait。我们可以通过将`#[global_allocator]`属性附在实现了`GlobalAlloc` trait的静态变量上来为`alloc` crate设置堆分配器。
 
 
 The second error occurs because calls to `allocate` can fail, most commonly when there is no more memory available. Our program must be able to react to this case, which is what the `#[alloc_error_handler]` function is for.
 
-第二个错误是因为调用`allocate`是有可能失败得，通常是因为没有更多可用得内存了。我们得程序必须能对此做出反应，这就是`#[alloc_error_handler]`方法得作用了。
+第二个错误是因为调用`allocate`是有可能失败的，通常是因为没有更多可用的内存了。我们的程序必须能对此做出反应，这就是`#[alloc_error_handler]`方法得作用了。
 
 We will describe these traits and attributes in detail in the following sections.
 
@@ -571,7 +571,7 @@ The implementation can be broken down into two parts:
 - **映射页面**：第二步是映射刚刚创建的页面范围内的所有页面。为此，我们使用`for`循环遍历该范围内的页面。我们为每个页面执行以下操作：
     - 使用[FrameAllocator::allocate_frame](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/trait.FrameAllocator.html#tymethod.allocate_frame)方法分配页面映射需要的物理帧上。当没有额外的帧时，该方法将返回`None`。遇到没有额外帧的情况时，我们使用[Option::ok_or](https://doc.rust-lang.org/core/option/enum.Option.html#method.ok_or)方法将错误转换为[MapToError::FrameAllocationFailed](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/enum.MapToError.html#variant.FrameAllocationFailed)错误，然后用[问号运算符](https://doc.rust-lang.org/edition-guide/rust-2018/error-handling-and-panics/the-question-mark-operator-for-easier-error-handling.html)以在出错时提前返回。
     - 为页面设置了必要的`PRESENT`和`WRITABLE`标志，以允许读取和写入访问，这对于堆内存是有实际意义的。
-    - 使用[Mapper::map_to](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#method.map_to)方法在活动页面表中创建映射。该方法可能会失败，因此我们再次使用问号运算符将错误传播给调用方。若成功，该方法将返回一个[MapperFlush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html)实例，然后使用该实例得[flush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html#method.flush)方法来更新页表转换缓存区。
+    - 使用[Mapper::map_to](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/trait.Mapper.html#method.map_to)方法在活动页面表中创建映射。该方法可能会失败，因此我们再次使用问号运算符将错误传播给调用方。若成功，该方法将返回一个[MapperFlush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html)实例，然后使用该实例得[flush](https://docs.rs/x86_64/0.14.2/x86_64/structures/paging/mapper/struct.MapperFlush.html#method.flush)方法来更新分页转换缓存区。
 
 The final step is to call this function from our `kernel_main`:
 
