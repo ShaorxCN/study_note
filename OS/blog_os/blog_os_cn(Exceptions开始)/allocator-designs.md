@@ -55,7 +55,7 @@ The idea behind a bump allocator is to linearly allocate memory by increasing (�
 
 The `next` pointer only moves in a single direction and thus never hands out the same memory region twice. When it reaches the end of the heap, no more memory can be allocated, resulting in an out-of-memory error on the next allocation.
 
-`next`指针只会朝一个方向异动所以永远不会将同一块内存发放两次。当他到达堆内存的末端，没有内存可以被分配的时候，那么下次分配就会出现内存不足的错误。
+`next`指针只会朝一个方向移动所以永远不会将同一块内存发放两次。当他到达堆内存的末端，没有内存可以被分配的时候，那么下次分配就会出现内存不足的错误。
 
 A bump allocator is often implemented with an allocation counter, which is increased by 1 on each `alloc` call and decreased by 1 on each `dealloc` call. When the allocation counter reaches zero, it means that all allocations on the heap have been deallocated. In this case, the `next` pointer can be reset to the start address of the heap, so that the complete heap memory is available for allocations again.
 
@@ -336,6 +336,8 @@ The dealloc function ignores the given pointer and `Layout` arguments. Instead, 
 #### Address Alignment(地址对齐)
 The `align_up` function is general enough that we can put it into the parent `allocator` module. A basic implementation looks like this:
 
+`align_up`函数非常通用，可以将其放入父级模块`allocator`中。其实现如下
+
 ```rust
 // in src/allocator.rs
 
@@ -597,7 +599,7 @@ impl ListNode {
 
 The type has a simple constructor function named `new` and methods to calculate the start and end addresses of the represented region. We make the `new` function a` const function`, which will be required later when constructing a static linked list allocator. Note that any use of mutable references in const functions (including setting the next field to `None`) is still unstable. In order to get it to compile, we need to add `#![feature(const_mut_refs)]` to the beginning of our `lib.rs`.
 
-该类型具有一个简单的构造函数`new`，以及用于计算所表示内存区域的开始地址和结束地址的方法。我们将新函数设为`const函数`，因为稍后会在构造静态链表分配器时使用到它。请注意，在const函数中使用可变引用（包括将next字段设置为`None`）仍然不稳定。为了能够编译，我们需要在`lib.rs`的开头添加`#![feature(const_mut_refs)]`。
+该类型具有一个简单的构造函数`new`，以及用于计算所表示内存区域的开始地址和结束地址的方法。我们将`new`函数设为`const函数`，因为稍后会在构造静态链表分配器时使用到它。请注意，在const函数中使用可变引用（包括将next字段设置为`None`）仍然不稳定。为了能够编译，我们需要在`lib.rs`的开头添加`#![feature(const_mut_refs)]`。
 
 With the `ListNode` struct as a building block, we can now create the `LinkedListAllocator` struct:
 
@@ -1047,7 +1049,7 @@ Much like allocation, deallocation is also very performant. It involves the foll
 
 Most notably, no traversal of the list is required for deallocation either. This means that the time required for a `dealloc` call stays the same regardless of the list length.
 
-值得注意的是，释放过程也不需要遍历链表。这意味着无论链表有多长，dealloc调用所需的时间都是一个常量。
+值得注意的是，释放过程也不需要遍历链表。这意味着无论链表有多长，`dealloc`调用所需的时间都是一个常量。
 
 #### Fallback Allocator(后备分配器)
 
@@ -1244,7 +1246,7 @@ The block must have at least the size and alignment required by the given `Layou
 
 Note that we don’t return the block size itself, but the index into the `BLOCK_SIZES` slice. The reason is that we want to use the returned index as an index into the `list_heads` array.
 
-请注意，这里并不返回块大小本身，而是返回`BLOCK_SIZES`切片的索引。原因是我们还要使用该索引作为l`ist_heads`数组的索引。
+请注意，这里并不返回块大小本身，而是返回`BLOCK_SIZES`切片的索引。原因是我们还要使用该索引作为`list_heads`数组的索引。
 
 
 #### Implementing `GlobalAlloc`(为固定大小的块分配器实现`GlobalAlloc`)
@@ -1491,4 +1493,4 @@ To fix the performance problems of the linked list approach, we created a `fixed
 
 There are many more allocator designs with different tradeoffs. `Slab allocation` works well to optimize the allocation of common fixed-size structures, but is not applicable in all situations. `Buddy allocation` uses a binary tree to merge freed blocks back together, but wastes a large amount of memory because it only supports power-of-2 block sizes. It’s also important to remember that each kernel implementation has a unique workload, so there is no “best” allocator design that fits all cases.
 
-还有很多分配器的设计有不同的权衡。`Slab allocation`在优化常见的固定大小结构的分配方面效果很好，但不是在所有情况下都适用。`Buddy allocation`使用二进制树将释放的块合并到一起，但由于它只支持2幂的块大小，所以浪费了大量的内存。同样重要的是要记住，每个内核实现都有独特的工作能力，所以没有适合所有情况的 "最佳 "分配器设计。
+还有很多分配器的设计有不同的权衡。`Slab allocation`在优化常见的固定大小结构的分配方面效果很好，但不是在所有情况下都适用。`Buddy allocation`使用二进制树将释放的块合并到一起，但由于它只支持2幂的块大小，所以浪费了大量的内存。同样重要的是要记住，每种内核实现都有独特的工作能力，所以没有适合所有情况的 "最佳 "分配器设计。
