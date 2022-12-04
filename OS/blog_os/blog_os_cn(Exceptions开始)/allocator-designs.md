@@ -6,8 +6,7 @@ This post explains how to implement heap allocators from scratch. It presents an
 
 This blog is openly developed on [GitHub](https://github.com/phil-opp/blog_os). If you have any problems or questions, please open an issue there. You can also leave comments at the bottom. The complete source code for this post can be found in the [post-11](https://github.com/phil-opp/blog_os/tree/post-11) branch.
 
-这篇博客是在[GitHub](https://github.com/phil-opp/blog_os)上公开开发的。如果你有任何问题或疑问，请在那里开一个问题。你也可以在底部留下评论。
-本帖的完整源代码可以在[post-11](https://github.com/phil-opp/blog_os/tree/post-11)分支中找到。
+这篇博客是在[GitHub](https://github.com/phil-opp/blog_os)上公开开发的。如果你有任何问题或疑问，请在那里开一个问题。你也可以在底部留下评论。本帖的完整源代码可以在[post-11](https://github.com/phil-opp/blog_os/tree/post-11)分支中找到。
 
 
 ## Introduction(介绍)
