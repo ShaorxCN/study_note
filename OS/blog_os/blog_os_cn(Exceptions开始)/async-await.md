@@ -839,7 +839,7 @@ Unlike `Pin<Box<T>>` instances, which have ownership of the wrapped value, `Pin<
 
 For further reading, check out the documentation of the [pin module](https://doc.rust-lang.org/nightly/core/pin/index.html) and the [Pin::new_unchecked](https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html#method.new_unchecked) method.
 
-要进一步阅读，请查看`pin模块`(https://doc.rust-lang.org/nightly/core/pin/index.html)和[Pin::new_unchecked](https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html#method.new_unchecked)方法的文档。
+要进一步阅读，请查看[pin模块](https://doc.rust-lang.org/nightly/core/pin/index.html)和[Pin::new_unchecked](https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html#method.new_unchecked)方法的文档。
 
 #### Pinning and Futures
 
