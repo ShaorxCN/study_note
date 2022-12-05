@@ -220,6 +220,8 @@ An alternative to waiting is to use future combinators. Future combinators are m
 
 As an example, a simple `string_len` combinator for converting a `Future<Output = String>` to a `Future<Output = usize>` could look like this:
 
+举个例子，一个将`Future<Output = String>` 转换为 `Future<Output = usize>`的`string_len`组合器如下面代码所示:
+
 ```rust
 struct StringLen<F> {
     inner_future: F,
@@ -262,7 +264,7 @@ With this `string_len` function, we can calculate the length of an asynchronous 
 
 Because manually writing combinator functions is difficult, they are often provided by libraries. While the Rust standard library itself provides no combinator methods yet, the semi-official (and `no_std` compatible) [futures](https://docs.rs/futures/0.3.4/futures/) crate does. Its [FutureExt](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html) trait provides high-level combinator methods such as [map](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html#method.map) or [then](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html#method.then), which can be used to manipulate the result with arbitrary closures.
 
-手动编写组合器函数比较困难，所以它们通常由库直接提供。尽管Rust标准库本身还没有提供官方组合器方法，但半官方（兼容`no_std`）的[futures](https://docs.rs/futures/0.3.4/futures/) crate可以。其F[FutureExt](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html) 特性提供了诸如[map](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html#method.map)或[then](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html#method.then)之类的高级组合器方法，可用于任意闭包来操作结果。
+手动编写组合器函数比较困难，所以它们通常由库直接提供。尽管Rust标准库本身还没有提供官方组合器方法，但半官方（兼容`no_std`）的[futures](https://docs.rs/futures/0.3.4/futures/) crate可以。其[FutureExt](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html) 特性提供了诸如[map](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html#method.map)或[then](https://docs.rs/futures/0.3.4/futures/future/trait.FutureExt.html#method.then)之类的高级组合器方法，可用于任意闭包来操作结果。
 
 #### Advantages(优势)
 
@@ -305,7 +307,7 @@ As you can imagine, this can quickly lead to very complex code for larger projec
 
 The idea behind async/await is to let the programmer write code that looks like normal synchronous code, but is turned into asynchronous code by the compiler. It works based on the two keywords `async` and `await`. The `async` keyword can be used in a function signature to turn a synchronous function into an asynchronous function that returns a future:
 
-Async/Await的思路是让程序员以编写看起来像同步代码的方式编写异步代码，只不最后是由编译器将同步代码转换为异步代码。它基于两个关键字`async`和`await`。在函数签名中使用`async`关键字，就可以将同步函数转换为一个返回future的异步函数：
+Async/Await的思路是让程序员以编写同步代码的方式编写异步代码，只不最后是由编译器将同步代码转换为异步代码。它基于两个关键字`async`和`await`。在函数签名中使用`async`关键字，就可以将同步函数转换为一个返回future的异步函数：
 
 ```rust
 async fn foo() -> u32 {
@@ -659,9 +661,7 @@ There are three fundamental approaches to solving the dangling pointer problem:
 
 - **Update the pointer on move**: The idea is to update the internal pointer whenever the struct is moved in memory so that it is still valid after the move. Unfortunately, this approach would require extensive changes to Rust that would result in potentially huge performance losses. The reason is that some kind of runtime would need to keep track of the type of all struct fields and check on every move operation whether a pointer update is required.
 
-- **Store an offset instead of self-references**: To avoid the requirement for updating pointers, the compiler could try to store self-references as offsets from the struct’s beginning instead. For example, the `element` field of the above `WaitingOnWriteState` struct could be stored in the form of an `element_offset` field with a value of 8 because the array element that the reference points to starts 8 bytes after the struct’s beginning. Since the offset stays the same when the struct is moved, no field updates are required.
-
-The problem with this approach is that it requires the compiler to detect all self-references. This is not possible at compile-time because the value of a reference might depend on user input, so we would need a runtime system again to analyze references and correctly create the state structs. This would not only result in runtime costs but also prevent certain compiler optimizations, so that it would cause large performance losses again.
+- **Store an offset instead of self-references**: To avoid the requirement for updating pointers, the compiler could try to store self-references as offsets from the struct’s beginning instead. For example, the `element` field of the above `WaitingOnWriteState` struct could be stored in the form of an `element_offset` field with a value of 8 because the array element that the reference points to starts 8 bytes after the struct’s beginning. Since the offset stays the same when the struct is moved, no field updates are required.<br>The problem with this approach is that it requires the compiler to detect all self-references. This is not possible at compile-time because the value of a reference might depend on user input, so we would need a runtime system again to analyze references and correctly create the state structs. This would not only result in runtime costs but also prevent certain compiler optimizations, so that it would cause large performance losses again.
 
 - **Forbid moving the struct**: As we saw above, the dangling pointer only occurs when we move the struct in memory. By completely forbidding move operations on self-referential structs, the problem can also be avoided. The big advantage of this approach is that it can be implemented at the type system level without additional runtime costs. The drawback is that it puts the burden of dealing with move operations on possibly self-referential structs on the programmer.
 
@@ -954,7 +954,7 @@ Now that we understand how cooperative multitasking based on futures and async/a
 
 With a recent-enough nightly, we can start using async/await in our `main.rs`:
 
-只要使用较近的nightly版本，我们就可以在main.rs中使用async/await：
+只要使用较近的nightly版本，我们就可以在`main.rs`中使用async/await：
 
 ```rust
 // in src/main.rs
@@ -1096,7 +1096,7 @@ impl SimpleExecutor {
 
 The struct contains a single `task_queue` field of type [VecDeque](https://doc.rust-lang.org/stable/alloc/collections/vec_deque/struct.VecDeque.html), which is basically a vector that allows for push and pop operations on both ends. The idea behind using this type is that we insert new tasks through the `spawn` method at the end and pop the next task for execution from the front. This way, we get a simple [FIFO queue](https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics)) (“first in, first out”).
 
-该结构体包含一个[VecDeque](https://doc.rust-lang.org/stable/alloc/collections/vec_deque/struct.VecDeque.html)类型的字段`task_queue`，这是一个在两端都能执行push和pop操作的向量。使用这种类型的思路是，通过`spawn`在队尾方法插入新任务，并从队首弹出要执行的下一个任务。这样，我们就得到了一个简单的[FIFO队列]((https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics)))（“先进先出”）。
+该结构体包含一个[VecDeque](https://doc.rust-lang.org/stable/alloc/collections/vec_deque/struct.VecDeque.html)类型的字段`task_queue`，这是一个在两端都能执行push和pop操作的向量。使用这种类型的思路是，通过`spawn`在队尾方法插入新任务，并从队首弹出要执行的下一个任务。这样，我们就得到了一个简单的[FIFO队列](https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics))（“先进先出”）。
 
 #### Dummy Waker
 
@@ -1129,7 +1129,7 @@ The `from_raw` function is unsafe because undefined behavior can occur if the pr
 
 The `RawWaker` type requires the programmer to explicitly define a [virtual method table](https://en.wikipedia.org/wiki/Virtual_method_table) (vtable) that specifies the functions that should be called when the `RawWaker` is cloned, woken, or dropped. The layout of this vtable is defined by the [RawWakerVTable](https://doc.rust-lang.org/stable/core/task/struct.RawWakerVTable.html) type. Each function receives a *const () argument, which is a type-erased pointer to some value. The reason for using a *const () pointer instead of a proper reference is that the RawWaker type should be non-generic but still support arbitrary types. The pointer is provided by putting it into the data argument of [RawWaker::new](https://doc.rust-lang.org/stable/core/task/struct.RawWaker.html#method.new), which just initializes a `RawWaker`. The Waker then uses this `RawWaker` to call the vtable functions with data.
 
-`RawWaker`类型要求程序员显式定义一个[虚拟方法表](https://en.wikipedia.org/wiki/Virtual_method_table)(vtable)，用以指定在克隆，唤醒、删除`RawWaker`时应调用的函数。vtable的布局由[RawWakerVTable](https://doc.rust-lang.org/stable/core/task/struct.RawWakerVTable.html)类型定义。每个函数都接收一个`*const ()`参数，该参数本质上是一个指向某结构体的擦除类型的`&self`指针，例如在堆上的分配。使用`*const ()`指针而不是某适当引用的原因是`RawWaker`类型应该是非泛型的，但仍需支持任意类型。作为参数传递给函数的指针值为给[RawWaker::new](https://doc.rust-lang.org/stable/core/task/struct.RawWaker.html#method.new)的`data`指针。
+`RawWaker`类型要求程序员显式定义一个[虚拟方法表](https://en.wikipedia.org/wiki/Virtual_method_table)(vtable)，用以指定在克隆，唤醒、删除`RawWaker`时应调用的函数。vtable的布局由[RawWakerVTable](https://doc.rust-lang.org/stable/core/task/struct.RawWakerVTable.html)类型定义。每个函数都接收一个`*const ()`参数，该参数本质上是一个指向某结构体但是擦除了类型的`&self`指针。使用`*const ()`指针而不是某适当类型引用的原因是`RawWaker`类型应该是非泛型的，但仍需支持任意类型。作为参数传递给函数的指针值为给[RawWaker::new](https://doc.rust-lang.org/stable/core/task/struct.RawWaker.html#method.new)的`data`指针。
 
 
 Typically, the `RawWaker` is created for some heap-allocated struct that is wrapped into the `Box` or `Arc` type. For such types, methods like [Box::into_raw](https://doc.rust-lang.org/stable/alloc/boxed/struct.Box.html#method.into_raw) can be used to convert the `Box<T>` to a `*const T` pointer. This pointer can then be cast to an anonymous `*const ()` pointer and passed to `RawWaker::new`. Since each vtable function receives the same `*const ()` as an argument, the functions can safely cast the pointer back to a `Box<T>` or a &T to operate on it. As you can imagine, this process is highly dangerous and can easily lead to undefined behavior on mistakes. For this reason, manually creating a `RawWaker` is not recommended unless necessary.
