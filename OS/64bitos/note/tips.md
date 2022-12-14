@@ -2,6 +2,7 @@
 
 - [linux](#linux)
 - [bochs](#bochs)
+- [汇编](#asm)
 
 
 
@@ -34,3 +35,9 @@ mkfs.ntfs xxx
 参见[这篇文章](https://www.cnblogs.com/oasisyang/p/15358137.html)
 
 
+<div id ="asm"><h2>汇编</h2</div>
+
+### 寄存器补充知识
+
+rax eax ax al/ah 其实应该算是一个寄存器。为了兼容以及拓展
+rax代表64位寄存器。eax代表32，ax 16  ah，al则是ax的高低8位
