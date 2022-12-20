@@ -47,7 +47,7 @@ int 10h
 ;======  rset floppy
 
 xor ah,ah
-xor dl,;(DH,DL)右下角位置 y,x这里是坐标(4f,18) 
+xor dl,dl;(DH,DL)右下角位置 y,x这里是坐标(4f,18) 
 ; int 13h  AH=00h 重置磁盘驱动器  DL=驱动器号 00H~7FH：软盘  80H~0FFH:硬盘
 ;       DL=00h 代表第一个软盘驱动器 drive A:
 ;          01h       第二个 drive B:
@@ -60,6 +60,6 @@ StartBootMessage: db "Start Boot"
 ;====== file zero until whole sector
 ; $-$$ 表示当前行被编译后的地址减去本节程序的起始地址 也就是相当于计算当前程序生成的机器码的长度 
 ; 510-结果则是说明引导程序需要填充的数据长度。因为读取都是按照扇区读取的 也就是512全部都读。times 则是重复多次操作 就是填充
-times 510-{$-$$} db 0
+times 510-($ - $$) db 0
 ;Intel处理器是小端序 所以存储 0x55 0xaa就是 0xaa55 小端序就是低字节的放在前面 也就是低内存位置 
 dw 0xaa55
