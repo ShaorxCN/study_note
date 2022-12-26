@@ -255,9 +255,9 @@ Label_Even:
     mov ax,[es:bx]  ;数据读入ax 2字节
     cmp byte [Odd],1  ;如果是奇数代表从开头开始 需要特殊处理
     jnz Label_Even2   ;偶数则直接跳转
-    shr ax,4        ;奇数右移4位
+    shr ax,4        ;奇数右移4位 小端序 然后第四位被上个表项占了
 Label_Even2:
-    and ax,0fffh    ;偶数读取  屏蔽前四位 是上个表项的
+    and ax,0fffh    ;偶数读取  屏蔽前四位 是下个表项或者移位出来的
     pop bx
     pop es
     ret
