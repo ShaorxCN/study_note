@@ -16,7 +16,7 @@ SectorBalance equ 17
 
     jmp short Label_Start
     nop
-    BS_OEMName db 'MINEboot'
+    BS_OEMName db 'MINEboot'        ;一定要放在这儿 代表软盘的描述信息 参见介绍里的引导扇区结构图
     BPB_BytesPerSec dw 512
     BPB_SecPerClus db 1
     BPB_RevdSecCnt dw 1

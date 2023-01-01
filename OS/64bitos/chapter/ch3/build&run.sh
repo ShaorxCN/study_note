@@ -1,5 +1,5 @@
 bximage 创建软盘 
-记得格式化
+
 
 
 
@@ -16,4 +16,4 @@ loader:
 mount boot.img /media/ -t vfat -o loop
 cp loader.bin /media/
 sync
-unmount /media/
+umount /media/
