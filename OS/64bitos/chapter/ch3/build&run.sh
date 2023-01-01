@@ -1,3 +1,8 @@
+bximage 创建软盘 
+记得格式化
+
+
+
 build:
 
 nasm boot.asm -o boot.bin

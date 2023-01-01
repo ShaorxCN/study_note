@@ -3,7 +3,7 @@ org 10000h
     mov ds,ax
     mov es,ax
     mov ss,ax
-    mov sp,0x7c00h
+    mov sp,0x7c00
 
 ;====== display on screen:Start Loader......
     mov ax,1301h              ;功能号等的准备工作

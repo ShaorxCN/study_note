@@ -14,22 +14,12 @@ SectorNumOfFAT1Start equ 1  ; FAT1开始扇区号
 ;数据区地址=根目录起始扇区号+根目录所占扇区数+值-2 -2放到前面就是17
 SectorBalance equ 17  
 
-;====== tmp variable
-RootDirSizeForLoop dw RootDirSectors
-SectorNo dw 0
-Odd  db 0        ;FAT表项12bit 就是1.5B 所以需要纪录奇偶
-
-;====== display messages
-StartBootMessage: db "Start Boot"
-NoLoaderMessage: db "ERROR:No LOADER Found"
-LoaderFileName: db "LOADER  BIN",0
-
     jmp short Label_Start
     nop
     BS_OEMName db 'MINEboot'
     BPB_BytesPerSec dw 512
     BPB_SecPerClus db 1
-    BPB_RevdSecCnt db 1
+    BPB_RevdSecCnt dw 1
     BPB_NumFATs db 2
     BPB_RootEntCnt dw 224
     BPB_TotSec16 dw 2880
@@ -261,6 +251,16 @@ Label_Even2:
     pop bx
     pop es
     ret
+;====== tmp variable
+RootDirSizeForLoop dw RootDirSectors
+SectorNo dw 0
+Odd  db 0        ;FAT表项12bit 就是1.5B 所以需要纪录奇偶
+
+;====== display messages
+StartBootMessage: db "Start Boot"
+NoLoaderMessage: db "ERROR:No LOADER Found"
+LoaderFileName: db "LOADER  BIN",0
+
 ;====== file zero until whole sector
     ; $-$$ 表示当前行被编译后的地址减去本节程序的起始地址 也就是相当于计算当前程序生成的机器码的长度 
     ; 510-结果则是说明引导程序需要填充的数据长度。因为读取都是按照扇区读取的 也就是512全部都读。times 则是重复多次操作 就是填充
