@@ -186,7 +186,7 @@ Label_Go_On_Loading_File:
     call Func_ReadOneSector    ;读取一个扇区
     pop ax                     ;此时ax = DIR_FstClus的值
     call Func_GetFATEntry      ;查看表项 是否需要继续读取
-    cmp ax,0fffh
+    cmp ax,0fffh               ;是否是最后一个簇 是的话就结束
     jz Label_File_Loaded
     push ax
     mov dx,RootDirSectors
@@ -195,7 +195,7 @@ Label_Go_On_Loading_File:
     add bx,[BPB_BytesPerSec]
     jmp Label_Go_On_Loading_File
 Label_File_Loaded:
-    jmp $
+    jmp BaseOfLoader:OffsetOfLoader  ;跳转到loader的部分  boot结束
 ;====== read one sector from floppy  ax中存放目标扇区号 cl中放需要读取的扇区个数
 Func_ReadOneSector:
     push bp
