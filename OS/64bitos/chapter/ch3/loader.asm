@@ -73,7 +73,7 @@ Label_Search_In_Root_Dir_Begin:
     mov ax,[SectorNo]     
     mov cl,1               
     call Func_ReadOneSector
-    mov si,LoaderFileName
+    mov si,KernelFileName
     mov di,8000h     
     cld              
     mov dx,10h      
@@ -96,7 +96,7 @@ Label_Go_On:
 Label_Different:
     and di,0ffe0h       
     add di,20h          
-    mov si,LoaderFileName
+    mov si,KernelFileName
     jmp Label_Search_For_LoaderBin
 Label_Goto_Next_Sector_In_Root_Dir:
     add word [SectorNo],1       
@@ -114,3 +114,147 @@ Label_No_KernelBin:
     mov bp,NoLoaderMessage
     int 10h
     jmp $
+;======  found loader.bin name in root director struct
+Label_FileName_Found:
+    mov ax,RootDirSectors
+    and di,0ffe0h        ;到当前条目开始位置
+    add di,01ah          ;根据目录结构 +26到DIR_FstClus 2个字节
+    mov cx,word [es:di]  ; DIR_FstClus 保存到cx
+    push cx              ;备份DIR_FstClus
+    add cx,ax            ;加上目录扇区的偏移
+    add cx,SectorBalance ;加上平衡值得到目标扇区
+    mov eax,BaseTmpOfKernelAddr  
+    mov es,eax          
+    mov bx,OffsetTmpOfKernelFile  ;设置目标地址
+    mov ax,cx              ;ax=文件所在开始扇区
+
+Label_Go_On_Loading_File:
+    push ax
+    push bx
+    mov ah,0eh           ; 准备10h的0eh功能 打印字符 此时bh=00 页码0 打印'.'
+    mov al,'.'
+    mov bl,0fh
+    int 10h
+    pop bx
+    pop ax
+
+    push	cx
+	push	eax
+	push	fs
+	push	edi
+	push	ds
+	push	esi
+
+	mov	cx,	200h
+	mov	ax,	BaseOfKernelFile
+	mov	fs,	ax
+	mov	edi,	dword	[OffsetOfKernelFileCount]
+
+	mov	ax,	BaseTmpOfKernelAddr
+	mov	ds,	ax
+	mov	esi,	OffsetTmpOfKernelFile
+Label_Mov_Kernel:
+    mov al,byte [ds:esi]
+    mov byte [fs:edi],al
+Label_File_Loaded:
+    jmp BaseOfLoader:OffsetOfLoader  ;跳转到loader的部分  boot结束
+;====== read one sector from floppy  ax中存放目标扇区号 cl中放需要读取的扇区个数
+[SECTION .s116]
+[BITS 16]
+Func_ReadOneSector:
+    push bp
+    mov bp,sp
+    ; 上面复制了sp 这边-2 相当于预留了两个byte 空间 用以下面的mov byte bp默认ss
+    sub esp,2
+    mov byte [bp-2],cl ;备份cl 调用方传入的读取的扇区数量
+    push bx
+    mov bl,[BPB_SecPerTrk]
+    ;被除数在ax 商在al 余数在ah 这里ax需要调用方放入
+    div bl
+    inc ah ;余数+1 得到chs的扇区号 
+    mov cl,ah ; 13h中断起始扇区号存储在CL
+    mov dh,al ; 商放到dh
+    shr al,1 ;右移一位得到柱面号(商/BPB_NumHeads)
+    mov ch,al ; 获得柱面号 13h中断要求放在CH
+    and dh,1 ;得到磁头号 
+    pop bx  ;恢复bx
+    mov dl,[BS_DrvNum];保存驱动器号
+Label_Go_On_Reading:
+	mov	ah,	2
+	mov	al,	byte	[bp - 2]
+	int	13h
+	jc	Label_Go_On_Reading
+	add	esp,	2
+	pop	bp
+	ret
+
+;=======	get FAT Entry
+
+Func_GetFATEntry:
+
+	push	es
+	push	bx
+	push	ax
+	mov	ax,	00
+	mov	es,	ax
+	pop	ax
+	mov	byte	[Odd],	0
+	mov	bx,	3
+	mul	bx
+	mov	bx,	2
+	div	bx
+	cmp	dx,	0
+	jz	Label_Even
+	mov	byte	[Odd],	1
+
+Label_Even:
+
+	xor	dx,	dx
+	mov	bx,	[BPB_BytesPerSec]
+	div	bx
+	push	dx
+	mov	bx,	8000h
+	add	ax,	SectorNumOfFAT1Start
+	mov	cl,	2
+	call	Func_ReadOneSector
+	
+	pop	dx
+	add	bx,	dx
+	mov	ax,	[es:bx]
+	cmp	byte	[Odd],	1
+	jnz	Label_Even_2
+	shr	ax,	4
+
+Label_Even_2:
+	and	ax,	0FFFh
+	pop	bx
+	pop	es
+	ret
+;=======	tmp variable
+RootDirSizeForLoop	dw	RootDirSectors
+SectorNo		dw	0
+Odd			db	0
+OffsetOfKernelFileCount	dd	OffsetOfKernelFile
+
+MemStructNumber		dd	0
+
+SVGAModeCounter		dd	0
+
+DisplayPosition		dd	0
+
+;=======	display messages
+
+StartLoaderMessage:	db	"Start Loader"
+NoLoaderMessage:	db	"ERROR:No KERNEL Found"
+KernelFileName:		db	"KERNEL  BIN",0
+StartGetMemStructMessage:	db	"Start Get Memory Struct (address,size,type)."
+GetMemStructErrMessage:	db	"Get Memory Struct ERROR"
+GetMemStructOKMessage:	db	"Get Memory Struct SUCCESSFUL!"
+
+StartGetSVGAVBEInfoMessage:	db	"Start Get SVGA VBE Info"
+GetSVGAVBEInfoErrMessage:	db	"Get SVGA VBE Info ERROR"
+GetSVGAVBEInfoOKMessage:	db	"Get SVGA VBE Info SUCCESSFUL!"
+
+StartGetSVGAModeInfoMessage:	db	"Start Get SVGA Mode Info"
+GetSVGAModeInfoErrMessage:	db	"Get SVGA Mode Info ERROR"
+GetSVGAModeInfoOKMessage:	db	"Get SVGA Mode Info SUCCESSFUL!"
