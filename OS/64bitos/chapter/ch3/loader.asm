@@ -53,13 +53,16 @@ Label_Start:
     mov cr0,eax       ;cr0第一位置1 开启保护模式
 
     mov ax,SelectorData32
-    mov fs,ax             ;位fs段寄存器加载新的数据段值 这样就可以通过fs获取1m以上的寻址能力
+    mov fs,ax             ;为fs段寄存器加载新的数据段值 这样就可以通过fs获取1m以上的寻址能力
     mov eax,cr0
     and al,11111110b
     mov cr0,eax           ;退出保护模式
 
     sti                   ;恢复中断
-
+;=======	reset floppy
+	xor	ah,	ah
+	xor	dl,	dl
+	int	13h
 ;====== search kernel.bin
     mov word [SectorNo],SectorNumOfRootDirStart
 
@@ -114,7 +117,7 @@ Label_No_KernelBin:
     mov bp,NoLoaderMessage
     int 10h
     jmp $
-;======  found loader.bin name in root director struct
+;======  found kernel.bin name in root director struct
 Label_FileName_Found:
     mov ax,RootDirSectors
     and di,0ffe0h        ;到当前条目开始位置
@@ -127,15 +130,18 @@ Label_FileName_Found:
     mov es,eax          
     mov bx,OffsetTmpOfKernelFile  ;设置目标地址
     mov ax,cx              ;ax=文件所在开始扇区
-
 Label_Go_On_Loading_File:
     push ax
     push bx
     mov ah,0eh           ; 准备10h的0eh功能 打印字符 此时bh=00 页码0 打印'.'
     mov al,'.'
     mov bl,0fh
-    int 10h
+    int 10h             ;输出调用
     pop bx
+    pop ax
+
+    mov cl,1
+    call Func_ReadOneSector     ;先读到 OffsetTmpOfKernelFile
     pop ax
 
     push	cx
@@ -152,12 +158,99 @@ Label_Go_On_Loading_File:
 
 	mov	ax,	BaseTmpOfKernelAddr
 	mov	ds,	ax
-	mov	esi,	OffsetTmpOfKernelFile
+	mov	esi,	OffsetTmpOfKernelFile       ;获取临时存放得位置
 Label_Mov_Kernel:
-    mov al,byte [ds:esi]
+    mov al,byte [ds:esi]                    ;一个字节一个字节得转移到1m得位置
     mov byte [fs:edi],al
+
+    inc esi
+    inc edi
+
+    loop Label_Mov_Kernel
+
+    mov eax, 0x1000
+    mov ds,eax
+
+    mov dword [OffsetOfKernelFileCount],edi
+
+    pop esi
+    pop ds
+    pop edi
+    pop fs
+    pop eax
+    pop ex
+
+    call Func_GetFATEntry
+    cmp ax,0FFFh
+    jz Label_File_Loaded  ;是的话代表加载完成  类似je
+    push ax
+    mov dx,RootDirSectors
+    add ax,dx
+    add ax,SectorBalance
+    jmp Label_Go_On_Loading_File
 Label_File_Loaded:
-    jmp BaseOfLoader:OffsetOfLoader  ;跳转到loader的部分  boot结束
+    mov ax,0B800h
+    mov gs,ax
+    mov ah,0fh
+    mov al,'G'
+    mov [gs:((80*0+39)*2)],ax ;屏幕第0行 第39列
+KillMotor:                       ;关闭软驱
+    push dx
+    mov dx,03F2h
+    mov al,0
+    out dx,al
+    pop dx
+;======= get memory address size type
+    mov	ax,	1301h
+	mov	bx,	000Fh
+	mov	dx,	0400h		;row 4
+	mov	cx,	24
+	push	ax
+	mov	ax,	ds
+	mov	es,	ax
+	pop	ax
+	mov	bp,	StartGetMemStructMessage       
+	int	10h                              ;打印信息 开始获取内存结构
+
+	mov	ebx,	0
+	mov	ax,	0x00
+	mov	es,	ax
+	mov	di,	MemoryStructBufferAddr	
+Label_Get_Mem_Struct:
+    mov eax,0x0E820
+    mov ecx,20
+    mov edx,0x534D4150  ;SMAP
+; 向es:di填充ecx字节的数据  不过通常就是20 不论ecx多少
+; cf=0表示调用成功 否则错误  ebx存放下个内存的描述符 已被第二次调用 第一次ebx必须是0 
+    int 15h             
+    jc Label_Get_Mem_Fail
+    add di,20                    ; 先准备好下次需要存储的位置 
+    cmp ebx,0                    ;0表示结束了
+    jne Label_Get_Mem_Struct     ;没有结束就继续调用
+    jmp Label_Get_Mem_OK               
+Label_Get_Mem_Fail:
+    mov	ax,	1301h
+	mov	bx,	008Ch
+	mov	dx,	0500h		;row 5
+	mov	cx,	23
+	push	ax
+	mov	ax,	ds
+	mov	es,	ax
+	pop	ax
+	mov	bp,	GetMemStructErrMessage
+	int	10h
+	jmp	$
+Label_Get_Mem_OK:
+	mov	ax,	1301h
+	mov	bx,	000Fh
+	mov	dx,	0600h		;row 6
+	mov	cx,	29
+	push	ax
+	mov	ax,	ds
+	mov	es,	ax
+	pop	ax
+	mov	bp,	GetMemStructOKMessage
+	int	10h
 ;====== read one sector from floppy  ax中存放目标扇区号 cl中放需要读取的扇区个数
 [SECTION .s116]
 [BITS 16]
@@ -230,6 +323,38 @@ Label_Even_2:
 	pop	bx
 	pop	es
 	ret
+;====== display num in al 直接写0x0b800的方法
+Label_DispAL:
+    push ecx
+    push edx
+    push edi          ;备份寄存器
+
+    mov edi,[DisplayPosition]  ;0b800后的准备偏移值
+    mov ah,0FH   ;黑底白字
+    mov dl,al    ;保存al
+    shr al,4     ;这里先展示al的高四位
+    mov ecx,2    ;loop次数
+.begin:
+    and al,0Fh  ;同样是为先展示al的高4为准备 置零
+    cmp al,9    ;这边按照16进制展示 所以做个转换  大于9就是字母a-f了
+    ja .1
+    add al,'0'
+    jmp .2
+.1:
+    sub  al,0Ah
+    add al,'A'
+.2:
+    mov [gs:edi],ax
+    add edi,2
+    mov al,dl     ; 之前的第四位回来 通过loop展示
+    loop .begin   ;先减1判断再是否执行 
+    mov [DisplayPosition],edi
+
+    pop edi
+    pop edx
+    pop ecx
+    ret
+
 ;=======	tmp variable
 RootDirSizeForLoop	dw	RootDirSectors
 SectorNo		dw	0
@@ -247,7 +372,7 @@ DisplayPosition		dd	0
 StartLoaderMessage:	db	"Start Loader"
 NoLoaderMessage:	db	"ERROR:No KERNEL Found"
 KernelFileName:		db	"KERNEL  BIN",0
-StartGetMemStructMessage:	db	"Start Get Memory Struct (address,size,type)."
+StartGetMemStructMessage:	db	"Start Get Memory Struct."
 GetMemStructErrMessage:	db	"Get Memory Struct ERROR"
 GetMemStructOKMessage:	db	"Get Memory Struct SUCCESSFUL!"
 
