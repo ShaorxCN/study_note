@@ -243,14 +243,137 @@ Label_Get_Mem_Fail:
 Label_Get_Mem_OK:
 	mov	ax,	1301h
 	mov	bx,	000Fh
-	mov	dx,	0600h		;row 6
+	mov	dx,	0600h		;row 6,0 col
 	mov	cx,	29
 	push	ax
 	mov	ax,	ds
 	mov	es,	ax
 	pop	ax
-	mov	bp,	GetMemStructOKMessage
+	mov	bp,	GetMemStructOKMessage ;es:bp
 	int	10h
+;======= get SVGA information 10h ax=4F00  SVGA=super VGA
+    mov ax,1301h
+    mov bx,000Fh
+    mov dx,0800h       ;row 8
+    mov cx,23
+    push ax
+    mov ax,ds
+    mov es,ax
+    pop ax
+    mov bp,StartGetSVGAVBEInfoMessage
+    int 10h
+
+    mov ax,0x00
+    mov es,ax
+    mov di,0x8000
+    mov ax,4F00h
+
+    int 10h
+
+    cmp ax,004Fh
+    jz .KO
+;======== Fail
+    mov ax,1301h
+    mov bx,008Ch
+    mov dx,0900h
+    mov cx,23
+    push ax
+    mov ax,ds
+    mov es,ax
+    pop ax
+    mov bp,GetSVGAVBEInfoErrMessage
+    int 10h
+
+    jmp $
+.KO:
+    mov ax,1301h ; al bit1=0 则属性在bl
+    mov bx,000Fh ;page 0     白色加亮
+    mov dx,0A00h  ;row 10
+    mov cx,29
+    push ax
+    mov ax,ds
+    mov es,ax
+    pop ax
+    mov bp,GetSVGAModeInfoOKMessage
+    int 10h
+;======= Get SVGA Mode info
+    mov ax,1301h
+    mov bx,000Fh
+    mov dx,0C00h
+    mov cx,24
+    push ax
+    mov ax,ds
+    mov es,ax
+    pop ax
+    mov bp,StartGetSVGAModeInfoMessage
+    int 10h
+
+    mov ax,0x00
+    mov es,ax
+    mov si,0x800e
+    mov esi,dword [es:si]
+    mov edi,0x8200
+Label_SVGA_Mode_Info_Get:
+    mov cx,word [es:esi]
+;======= display SVGA mode information
+    push ax
+    mov ax,00h
+    mov al,ch
+    call Label_DispAL
+
+    mov ax,00h
+    mov al,cl
+    call Label_DispAL
+
+    pop ax
+;====== 
+    cmp	cx,	0FFFFh
+	jz	Label_SVGA_Mode_Info_Finish
+
+	mov	ax,	4F01h
+	int	10h
+
+	cmp	ax,	004Fh
+
+	jnz	Label_SVGA_Mode_Info_FAIL	
+
+	add	esi,	2
+	add	edi,	0x100
+
+	jmp	Label_SVGA_Mode_Info_Get
+Label_SVGA_Mode_Info_FAIL:
+	mov	ax,	1301h
+	mov	bx,	008Ch
+	mov	dx,	0D00h		;row 13
+	mov	cx,	24
+	push	ax
+	mov	ax,	ds
+	mov	es,	ax
+	pop	ax
+	mov	bp,	GetSVGAModeInfoErrMessage
+	int	10h
+
+Label_SET_SVGA_Mode_VESA_VBE_FAIL:
+	jmp	$
+Label_SVGA_Mode_Info_Finish:
+
+	mov	ax,	1301h
+	mov	bx,	000Fh
+	mov	dx,	0E00h		;row 14
+	mov	cx,	30
+	push	ax
+	mov	ax,	ds
+	mov	es,	ax
+	pop	ax
+	mov	bp,	GetSVGAModeInfoOKMessage
+	int	10h
+;====== set SVGA information  设置视频图像芯片的显示模式
+    mov ax,4F02h
+    mov bx,4180h  ;==========================mode: 0x180 or 0x143
+    int 10h
+
+    cmp ax,004Fh  ;ah=0 成功 否则失败 al=4fH 代表功能支持
+    jnz Label_SET_SVGA_Mode_VESA_VBE_FAIL
 ;====== read one sector from floppy  ax中存放目标扇区号 cl中放需要读取的扇区个数
 [SECTION .s116]
 [BITS 16]
