@@ -5,12 +5,26 @@ BaseOfKernelFile equ 0x00
 OffsetOfKernelFile equ 0x100000         ;1Mb处 因为1MB一下可能并不全部可用且内核会增大
 
 BaseTmpOfKernelAddr equ 0x00
-OffsetTmpOfKernelFile equ 0x7E00       ;临时存储 因为是通过13h读取 其仅支持上限1m的寻址 所以暂时先放这儿在放到1mb以上的地方
+OffsetTmpOfKernelFile equ 0x7E00       ;临时存储 因为是通过13h读取 其仅支持上限1m的寻址 所以暂时先放这儿再放到1mb以上的地方
 
 MemoryStructBufferAddr equ 0x7E00
+; :表示地址  不带:直接值
+; 定义GDT表 空(必须)+2个 共三个表项
+[SECTION gdt]
+LABEL_GDT:		dd	0,0        ;空描述符
+LABEL_DESC_CODE32:	dd	0x0000FFFF,0x00CF9A00
+LABEL_DESC_DATA32:	dd	0x0000FFFF,0x00CF9200
+
+GdtLen	equ	$ - LABEL_GDT          ;当前行编译后的地址到LABEL_GDT的偏移GDT表的长度
+GdtPtr	dw	GdtLen - 1             ;GDT界限   低位 表示长度
+	    dd	LABEL_GDT              ;GDT基地址    这个变量6字节 2+4  16+32 用来放入GDTR
+
+SelectorCode32	equ	LABEL_DESC_CODE32 - LABEL_GDT   ;8
+SelectorData32	equ	LABEL_DESC_DATA32 - LABEL_GDT   ;16?
+
 
 [SECTION .s16]
-[BITS 16]                  ;告诉编译器 一下代码将会运行在16位的环境中 同理32位宽就是BITS 32
+[BITS 16]                  ;告诉编译器 以下代码将会运行在16位的环境中 同理32位宽就是BITS 32
 ;当处于16位宽下 使用32位宽数据指令需要在指令前加入前缀0x66 使用32位宽地址指令需要加前缀0x67
 
 Label_Start:
@@ -374,6 +388,21 @@ Label_SVGA_Mode_Info_Finish:
 
     cmp ax,004Fh  ;ah=0 成功 否则失败 al=4fH 代表功能支持
     jnz Label_SET_SVGA_Mode_VESA_VBE_FAIL
+;=======	init IDT GDT goto protect mode 
+
+	cli			; 关可屏蔽中断响应
+
+	db	0x66                    ;LGDT 和 LIDT指令前缀 修饰当前指令操作数是32位宽
+	lgdt	[GdtPtr]
+
+;	db	0x66
+;	lidt	[IDT_POINTER]
+
+	mov	eax,	cr0         ;位0使PE 位31是PG
+	or	eax,	1
+	mov	cr0,	eax	        ;置位pe
+
+	jmp	dword SelectorCode32:GO_TO_TMP_Protect
 ;====== read one sector from floppy  ax中存放目标扇区号 cl中放需要读取的扇区个数
 [SECTION .s116]
 [BITS 16]
@@ -477,7 +506,17 @@ Label_DispAL:
     pop edx
     pop ecx
     ret
+;=======	tmp IDT
+;在切换前已经cli关中断了 所以只需要初始化结构就行 如果可以保证切换过程中无中断 没有IDT也可以
+; DQ 四字 八字节  DT define ten bytes
+;IDT表项 保护模式下8字节
+IDT:
+	times	0x50	dq	0   ;80X8 640字节
+IDT_END:
 
+IDT_POINTER:
+		dw	IDT_END - IDT - 1
+		dd	IDT
 ;=======	tmp variable
 RootDirSizeForLoop	dw	RootDirSectors
 SectorNo		dw	0
