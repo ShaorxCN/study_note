@@ -22,6 +22,18 @@ GdtPtr	dw	GdtLen - 1             ;GDT界限   低位 表示长度
 SelectorCode32	equ	LABEL_DESC_CODE32 - LABEL_GDT   ;8
 SelectorData32	equ	LABEL_DESC_DATA32 - LABEL_GDT   ;16?
 
+[SECTION gdt64]
+
+LABEL_GDT64:		dq	0x0000000000000000
+LABEL_DESC_CODE64:	dq	0x0020980000000000
+LABEL_DESC_DATA64:	dq	0x0000920000000000
+
+GdtLen64	equ	$ - LABEL_GDT64
+GdtPtr64	dw	GdtLen64 - 1
+		    dd	LABEL_GDT64
+
+SelectorCode64	equ	LABEL_DESC_CODE64 - LABEL_GDT64
+SelectorData64	equ	LABEL_DESC_DATA64 - LABEL_GDT64
 
 [SECTION .s16]
 [BITS 16]                  ;告诉编译器 以下代码将会运行在16位的环境中 同理32位宽就是BITS 32
@@ -403,6 +415,95 @@ Label_SVGA_Mode_Info_Finish:
 	mov	cr0,	eax	        ;置位pe
 
 	jmp	dword SelectorCode32:GO_TO_TMP_Protect
+
+[SECTION .s32]
+[BITS 32]
+
+GO_TO_TMP_Protect:
+;=======	go to tmp long mode
+	mov	ax,	0x10
+	mov	ds,	ax
+	mov	es,	ax
+	mov	fs,	ax
+	mov	ss,	ax
+	mov	esp,	7E00h
+
+	call	support_long_mode
+	test	eax,	eax    ;测试eax eax按位and
+
+	jz	no_support         ;zf=1 也就说运算结果位0  跳转no support  
+;=======	init temporary page table 0x90000  支持就初始化临时页表  页表项8字节   TODO
+	mov	dword	[0x90000],	0x91007
+	mov	dword	[0x90800],	0x91007		
+
+	mov	dword	[0x91000],	0x92007
+
+	mov	dword	[0x92000],	0x000083
+
+	mov	dword	[0x92008],	0x200083
+
+	mov	dword	[0x92010],	0x400083
+
+	mov	dword	[0x92018],	0x600083
+
+	mov	dword	[0x92020],	0x800083
+
+	mov	dword	[0x92028],	0xa00083
+;=======	load GDTR  
+; 段寄存器的重置 cs依靠跳转执行
+	db	0x66
+	lgdt	[GdtPtr64]
+	mov	ax,	0x10
+	mov	ds,	ax
+	mov	es,	ax
+	mov	fs,	ax
+	mov	gs,	ax
+	mov	ss,	ax
+
+	mov	esp,	7E00h
+;=======	open PAE
+
+	mov	eax,	cr4
+	bts	eax,	5                   ;将eax的5bit取出放入cf 然后将5bit位置1 也就是PAE位
+	mov	cr4,	eax
+;=======	load	cr3
+; 手动设置cr3
+	mov	eax,	0x90000
+	mov	cr3,	eax
+;=======	enable long-mode
+; 置位LME 激活IA-32e模式
+	mov	ecx,	0C0000080h		;IA32_EFER 通过向ECX传递寄存器地址来实现MSR寄存器组的读写。MSR寄存器是EDX:EAX组成的64位寄存器 EDX高32；必须0特权级下执行
+	rdmsr
+
+	bts	eax,	8
+	wrmsr
+;=======	open PE and paging
+	mov	eax,	cr0
+	bts	eax,	0
+	bts	eax,	31
+	mov	cr0,	eax
+
+	jmp	SelectorCode64:OffsetOfKernelFile
+;=======	test support long mode or not
+support_long_mode:
+	mov	eax,	0x80000000     ;执行完cpuid后 eax中存放的是拓展信息功能代码的最大值
+; CPUID操作码是一个面向x86架构的处理器补充指令，它的名称派生自CPU识别，
+; 作用是允许软件发现处理器的详细信息。它由英特尔在1993年引入奔腾和SL增强486处理器。
+; 默认使用eax来存储执行前的功能号  参考 https://www.felixcloutier.com/x86/cpuid
+	cpuid                     
+	cmp	eax,	0x80000001  ;只有当cpu支持的功能代码大于这个时才有可能支持长模式
+	setnb	al	                      ;是否大于等于  就置位al 1 否则al 0
+	jb	support_long_mode_done        ;小于就跳转
+	mov	eax,	0x80000001            ; eax ebx 保留 ecx edx则事故拓展功能位信息
+	cpuid
+	bt	edx,	29                    ;edx从29bit的位置 拷贝到carry flag 因为拓展功能项0x80000001的第29表示是否支持IA-32e
+	setc	al                        ;set byte if cf=1  也就是说支持的话将al设置为1
+support_long_mode_done:              
+	movzx	eax,	al                 ;使用0填充eax剩下的位  这里相当于只有al位置保留其他置零 小于的时候al时0 大于al是1
+	ret
+;=======	no support
+no_support:
+	jmp	$
 ;====== read one sector from floppy  ax中存放目标扇区号 cl中放需要读取的扇区个数
 [SECTION .s116]
 [BITS 16]
