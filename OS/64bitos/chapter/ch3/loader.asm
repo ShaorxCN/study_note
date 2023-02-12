@@ -126,7 +126,7 @@ Label_Different:
     and di,0ffe0h       
     add di,20h          
     mov si,KernelFileName
-    jmp Label_Search_For_LoaderBin
+    jmp Label_Search_For_KernelBin
 Label_Goto_Next_Sector_In_Root_Dir:
     add word [SectorNo],1       
     jmp Label_Search_In_Root_Dir_Begin
@@ -204,7 +204,7 @@ Label_Mov_Kernel:
     pop edi
     pop fs
     pop eax
-    pop ex
+    pop cx
 
     call Func_GetFATEntry
     cmp ax,0FFFh
