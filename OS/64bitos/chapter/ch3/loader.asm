@@ -25,7 +25,7 @@ GdtPtr	dw	GdtLen - 1             ;GDT界限   低位 表示长度
 
 ; 段描述符再GDT中的段选择子
 SelectorCode32	equ	LABEL_DESC_CODE32 - LABEL_GDT   ;8 =  0000 0000 0001 0000 RPL(bit[0,1] 特权级别 这里是0 TI(bit[2] 0表示GDT) index(bit[3-15] 这里是1))
-SelectorData32	equ	LABEL_DESC_DATA32 - LABEL_GDT   ;16?
+SelectorData32	equ	LABEL_DESC_DATA32 - LABEL_GDT   ;16
 
 [SECTION gdt64]
 
@@ -94,137 +94,137 @@ Label_Start:
 	xor	ah,	ah
 	xor	dl,	dl
 	int	13h
-; ;====== search kernel.bin
-;     mov word [SectorNo],SectorNumOfRootDirStart
+;====== search kernel.bin
+    mov word [SectorNo],SectorNumOfRootDirStart
 
-; Label_Search_In_Root_Dir_Begin:
-;     cmp word [RootDirSizeForLoop],0 
-;     jz Label_No_KernelBin
-;     dec word [RootDirSizeForLoop]
-;     mov ax,00h
-;     mov es,ax       
-;     mov bx,8000h    
-;     mov ax,[SectorNo]     
-;     mov cl,1               
-;     call Func_ReadOneSector
-;     mov si,KernelFileName
-;     mov di,8000h     
-;     cld              
-;     mov dx,10h      
-; Label_Search_For_KernelBin:
-;     cmp dx,0         
-;     jz Label_Goto_Next_Sector_In_Root_Dir
-;     dec dx
-;     mov cx,11                
-; Label_Cmp_FileName:
-;     cmp cx,0
-;     jz Label_FileName_Found
-;     dec cx
-;     lodsb           
-;     cmp al,byte [es:di]  
-;     jz Label_Go_On       
-;     jmp Label_Different  
-; Label_Go_On:
-;     inc di
-;     jmp Label_Cmp_FileName
-; Label_Different:
-;     and di,0ffe0h       
-;     add di,20h          
-;     mov si,KernelFileName
-;     jmp Label_Search_For_KernelBin
-; Label_Goto_Next_Sector_In_Root_Dir:
-;     add word [SectorNo],1       
-;     jmp Label_Search_In_Root_Dir_Begin
-; ;====== display on screen:ERROR:No KERNEL Found
-; Label_No_KernelBin:
-;     mov ax,1301h
-;     mov bx,008ch  
-;     mov dx,0100h
-;     mov cx,21     
-;     push ax
-;     mov ax,ds
-;     mov es,ax
-;     pop ax
-;     mov bp,NoLoaderMessage
-;     int 10h
-;     jmp $
-; ;======  found kernel.bin name in root director struct
-; Label_FileName_Found:
-;     mov ax,RootDirSectors
-;     and di,0ffe0h        ;到当前条目开始位置
-;     add di,01ah          ;根据目录结构 +26到DIR_FstClus 2个字节
-;     mov cx,word [es:di]  ; DIR_FstClus 保存到cx
-;     push cx              ;备份DIR_FstClus
-;     add cx,ax            ;加上目录扇区的偏移
-;     add cx,SectorBalance ;加上平衡值得到目标扇区
-;     mov eax,BaseTmpOfKernelAddr  
-;     mov es,eax          
-;     mov bx,OffsetTmpOfKernelFile  ;设置目标地址
-;     mov ax,cx              ;ax=文件所在开始扇区
-; Label_Go_On_Loading_File:
-;     push ax
-;     push bx
-;     mov ah,0eh           ; 准备10h的0eh功能 打印字符 此时bh=00 页码0 打印'.'
-;     mov al,'.'
-;     mov bl,0fh
-;     int 10h             ;输出调用
-;     pop bx
-;     pop ax
+Label_Search_In_Root_Dir_Begin:
+    cmp word [RootDirSizeForLoop],0 
+    jz Label_No_KernelBin
+    dec word [RootDirSizeForLoop]
+    mov ax,00h
+    mov es,ax       
+    mov bx,8000h    
+    mov ax,[SectorNo]     
+    mov cl,1               
+    call Func_ReadOneSector
+    mov si,KernelFileName
+    mov di,8000h     
+    cld              
+    mov dx,10h      
+Label_Search_For_KernelBin:
+    cmp dx,0         
+    jz Label_Goto_Next_Sector_In_Root_Dir
+    dec dx
+    mov cx,11                
+Label_Cmp_FileName:
+    cmp cx,0
+    jz Label_FileName_Found
+    dec cx
+    lodsb           
+    cmp al,byte [es:di]  
+    jz Label_Go_On       
+    jmp Label_Different  
+Label_Go_On:
+    inc di
+    jmp Label_Cmp_FileName
+Label_Different:
+    and di,0ffe0h       
+    add di,20h          
+    mov si,KernelFileName
+    jmp Label_Search_For_KernelBin
+Label_Goto_Next_Sector_In_Root_Dir:
+    add word [SectorNo],1       
+    jmp Label_Search_In_Root_Dir_Begin
+;====== display on screen:ERROR:No KERNEL Found
+Label_No_KernelBin:
+    mov ax,1301h
+    mov bx,008ch  
+    mov dx,0100h
+    mov cx,21     
+    push ax
+    mov ax,ds
+    mov es,ax
+    pop ax
+    mov bp,NoLoaderMessage
+    int 10h
+    jmp $
+;======  found kernel.bin name in root director struct
+Label_FileName_Found:
+    mov ax,RootDirSectors
+    and di,0ffe0h        ;到当前条目开始位置
+    add di,01ah          ;根据目录结构 +26到DIR_FstClus 2个字节
+    mov cx,word [es:di]  ; DIR_FstClus 保存到cx
+    push cx              ;备份DIR_FstClus
+    add cx,ax            ;加上目录扇区的偏移
+    add cx,SectorBalance ;加上平衡值得到目标扇区
+    mov eax,BaseTmpOfKernelAddr  
+    mov es,eax          
+    mov bx,OffsetTmpOfKernelFile  ;设置目标地址
+    mov ax,cx              ;ax=文件所在开始扇区
+Label_Go_On_Loading_File:
+    push ax
+    push bx
+    mov ah,0eh           ; 准备10h的0eh功能 打印字符 此时bh=00 页码0 打印'.'
+    mov al,'.'
+    mov bl,0fh
+    int 10h             ;输出调用
+    pop bx
+    pop ax
 
-;     mov cl,1
-;     call Func_ReadOneSector     ;先读到 OffsetTmpOfKernelFile
-;     pop ax
+    mov cl,1
+    call Func_ReadOneSector     ;先读到 OffsetTmpOfKernelFile
+    pop ax
 
-;     push	cx
-; 	push	eax
-; 	push	fs
-; 	push	edi
-; 	push	ds
-; 	push	esi
+    push	cx
+	push	eax
+	push	fs
+	push	edi
+	push	ds
+	push	esi
 
-; 	mov	cx,	200h
-; 	mov	ax,	BaseOfKernelFile
-; 	mov	fs,	ax
-; 	mov	edi,	dword	[OffsetOfKernelFileCount]
+	mov	cx,	200h
+	mov	ax,	BaseOfKernelFile
+	mov	fs,	ax
+	mov	edi,	dword	[OffsetOfKernelFileCount]
 
-; 	mov	ax,	BaseTmpOfKernelAddr
-; 	mov	ds,	ax
-; 	mov	esi,	OffsetTmpOfKernelFile       ;获取临时存放得位置
-; Label_Mov_Kernel:
-;     mov al,byte [ds:esi]                    ;一个字节一个字节得转移到1m得位置
-;     mov byte [fs:edi],al
+	mov	ax,	BaseTmpOfKernelAddr
+	mov	ds,	ax
+	mov	esi,	OffsetTmpOfKernelFile       ;获取临时存放得位置
+Label_Mov_Kernel:
+    mov al,byte [ds:esi]                    ;一个字节一个字节得转移到1m得位置
+    mov byte [fs:edi],al
 
-;     inc esi
-;     inc edi
+    inc esi
+    inc edi
 
-;     loop Label_Mov_Kernel
+    loop Label_Mov_Kernel
 
-;     mov eax, 0x1000
-;     mov ds,eax
+    mov eax, 0x1000
+    mov ds,eax
 
-;     mov dword [OffsetOfKernelFileCount],edi
+    mov dword [OffsetOfKernelFileCount],edi
 
-;     pop esi
-;     pop ds
-;     pop edi
-;     pop fs
-;     pop eax
-;     pop cx
+    pop esi
+    pop ds
+    pop edi
+    pop fs
+    pop eax
+    pop cx
 
-;     call Func_GetFATEntry
-;     cmp ax,0FFFh
-;     jz Label_File_Loaded  ;是的话代表加载完成  类似je
-;     push ax
-;     mov dx,RootDirSectors
-;     add ax,dx
-;     add ax,SectorBalance
-;     jmp Label_Go_On_Loading_File
-; Label_File_Loaded:
-;     mov ax,0B800h
-;     mov gs,ax
-;     mov ah,0fh
-;     mov al,'G'
-;     mov [gs:((80*0+39)*2)],ax ;屏幕第0行 第39列
+    call Func_GetFATEntry
+    cmp ax,0FFFh
+    jz Label_File_Loaded  ;是的话代表加载完成  类似je
+    push ax
+    mov dx,RootDirSectors
+    add ax,dx
+    add ax,SectorBalance
+    jmp Label_Go_On_Loading_File
+Label_File_Loaded:
+    mov ax,0B800h
+    mov gs,ax
+    mov ah,0fh
+    mov al,'G'
+    mov [gs:((80*0+39)*2)],ax ;屏幕第0行 第39列
 KillMotor:                       ;关闭软驱
     push dx
     mov dx,03F2h
@@ -418,7 +418,9 @@ Label_SVGA_Mode_Info_Finish:
 	mov	eax,	cr0         ;位0使PE 位31是PG
 	or	eax,	1
 	mov	cr0,	eax	        ;置位pe
-
+	; 执行跳转 因为实模式下还是段*16+offset的寻址方式 保护模式已经是段选择子的形式了
+	; 这里就是手动更新cs中的值 改为段选择子:offset
+	; 之前cpu流水线内部分预先记载的指令都是按照16位模式处理的 这里跳转也有清空流水线的作用 后面的代码通过bits 32声明式32位模式
 	jmp	dword SelectorCode32:GO_TO_TMP_Protect
 
 [SECTION .s32]
