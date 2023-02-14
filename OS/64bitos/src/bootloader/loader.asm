@@ -444,7 +444,10 @@ GO_TO_TMP_Protect:
 	test	eax,	eax    ;测试eax eax按位and
 
 	jz	no_support         ;zf=1 也就说运算结果位0  跳转no support  
-;=======	init temporary page table 0x90000  支持就初始化临时页表  页表项8字节   TODO
+;=======	init temporary page table 0x90000  支持就初始化临时页表  x86_64 页表项8字节   
+; 实际页表项大小根据设置 比如 4G 内存空间 4KB页大小 那么就是4G/4KB个页 那就是需要2的20次方 那就是至少20bit 再加上权限是否在内存等信息和对齐 
+; 那么就可以设置为4B大小的页表项
+;TODO
 	mov	dword	[0x90000],	0x91007
 	mov	dword	[0x90800],	0x91007		
 
