@@ -14,7 +14,7 @@ _start:
 
 //=======	load GDTR
 
-	lgdt	GDT_POINTER(%rip)
+	lgdt	GDT_POINTER(%rip)   // rip相对寻址 这样就是链接运行的时候决定  编译的时候是节 链接变成段 这个就是相对pc的标号？ 当发现base register 是rip displacement变成距离pc的偏移值
 
 //=======	load	IDTR
 
@@ -52,9 +52,9 @@ entry64:
 	movq	$0xffff800000007E00,	%rsp		/* rsp address */
 
 	movq	go_to_kernel(%rip),	%rax		/* movq address */
-	pushq	$0x08
+	pushq	$0x08                           // 代表index 1
 	pushq	%rax
-	lretq
+	lretq                                    // 等价于pop rip ,pop cs selector 这里rax先出 定位到go_to_kernel 然后是0x08 代表的选择子
 
 go_to_kernel:
 	.quad	Start_Kernel
@@ -85,7 +85,7 @@ __PDPTE:
 
 .org	0x3000
 
-// page directory entry 页表目录项
+// page directory entry 页表目录项       这里bit[7]都是1 那就是2Mb的中页 PED中拆解出的就是实际物理地址
 __PDE:
 
 	.quad	0x000083	
@@ -93,7 +93,7 @@ __PDE:
 	.quad	0x400083
 	.quad	0x600083
 	.quad	0x800083
-	.quad	0xe0000083		/*0x a00000*/
+	.quad	0xe0000083		 //  35-21bit  0000 1110 0000 0000 0000 0000 0000 0000 0000 =0xe0000000   /*0x a00000*/ 这里的index是30-21 也就是 000000101 就是index=5 就是这里
 	.quad	0xe0200083
 	.quad	0xe0400083
 	.quad	0xe0600083		/*0x1000000*/
@@ -110,6 +110,13 @@ __PDE:
 
 .globl GDT_Table                // 定义全局的GDT表 .global symbol 代表symbol在obj中全局可见 这里仅仅是声明 需要symbol的定义 不然报错
 
+// 这里解析下 cs的 也就是index1 或者说selector 是8
+// 0000 0000 0010 0000 1001 1000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
+// bit 15-0 limit  bit 39-16 baseAddr 默认0 为了平坦内存空间
+// bit[53] L位 1表示64位模式 否则32位兼容模式  这里是0010里的1 bit[54]0 默认操作数位宽32 地址宽64
+// bit[47] 1 表示在内存中 DPL bit[46-45] 特权级最高0
+// S bit[44] 1 表示非系统段 CD bit[43] 1 代表代码段
+// bit[63-56]表示BaseAddr(H) 这里是0000 0000  64位下等于彻底舍弃了分段 理解是rip直接是分页的完整索引以及offset？
 GDT_Table:
     .quad    0x0000000000000000    /*0 NULL descriptor 00*/
     .quad    0x0020980000000000    /*1 KERNEL Code 64-bit Segment 08*/
@@ -122,8 +129,8 @@ GDT_Table:
 GDT_END:
 
 GDT_POINTER:                                            // 区分 这里是初始化结构以及定位指针 不是GDTR用 所以非48bit
-GDT_LIMIT:    .word    GDT_END - GDT_Table - 1         //  .word 等价于 .int .long  4byte 32bit len 文档里说是根据目标机器 The size of the number emitted, and its byte order, depend on what target computer the assembly is for.
-GDT_BASE:     .quad    GDT_Table                       //  64bit base
+GDT_LIMIT:    .word    GDT_END - GDT_Table - 1         //  .word   2byte 16bit len 文档里说是根据目标机器 The size of the number emitted, and its byte order, depend on what target computer the assembly is for.
+GDT_BASE:     .quad    GDT_Table                       //  64bit base 保护模式下是32+16 这里64+16
 
 //=======     IDT_Table
 
@@ -148,4 +155,4 @@ TSS64_END:
 
 TSS64_POINTER:
 TSS64_LIMIT:    .word    TSS64_END - TSS64_Table - 1
-TSS64_BASE:     .quad    TSS64_T
+TSS64_BASE:     .quad    TSS64_Table
