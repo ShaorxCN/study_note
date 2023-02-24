@@ -166,3 +166,58 @@ test:pre
 
 这里默认执行的是`zero` 也就是执行`echo "zero"`。这里需要注意的是 `.PHONY`其实是为了解决标号和目标文件冲突的问题。目标文件也是可以作为标号的。也就是说如果`test:pre`放到`zero`前，那么make默认执行的就是他。但是会因为依赖的`pre`不存在报错
 
+这里贴下显示模式中分辨率坐标系图:
+
+<img src="./img/vga.png" >
+
+这里是测试时控制屏幕颜色的代码
+
+```c
+void Start_Kernel(void)
+{
+	// header.S 中将帧缓存的物理地址(0xe0000000) 映射到0xffff800000a00000和0xa00000处
+	// loader设置了显示模式(（模式号：0x180、分辨率：1440×900、颜色深度：32 bit  4字节表示一个像素点）)
+	// Loader引导加载程序设置的显示模式可支持32位颜色深度的像素点，其中0~7位代表蓝颜色(0x000000ff）)，8~15位代表绿颜色(0x0000ff00)，16~23位代表红颜色(0x00ff0000)，白色(0x00ffffff) 24~31位是保留位。
+	// 这32 bit位值可以组成16 M种不同的颜色，可以表现出真实的色彩
+	int *addr = (int *)0xffff800000a00000;
+	int i;
+
+    // 画20行的红色（小端序） 下面同理 20行的绿色 和20行的蓝色 最后时20行的白色
+	for(i = 0 ;i<1440*20;i++)
+	{
+		*((char *)addr+0)=(char)0x00;
+		*((char *)addr+1)=(char)0x00;
+		*((char *)addr+2)=(char)0xff;
+		*((char *)addr+3)=(char)0x00;	
+		addr +=1;	
+	}
+	for(i = 0 ;i<1440*20;i++)
+	{
+		*((char *)addr+0)=(char)0x00;
+		*((char *)addr+1)=(char)0xff;
+		*((char *)addr+2)=(char)0x00;
+		*((char *)addr+3)=(char)0x00;	
+		addr +=1;	
+	}
+	for(i = 0 ;i<1440*20;i++)
+	{
+		*((char *)addr+0)=(char)0xff;
+		*((char *)addr+1)=(char)0x00;
+		*((char *)addr+2)=(char)0x00;
+		*((char *)addr+3)=(char)0x00;	
+		addr +=1;	
+	}
+	for(i = 0 ;i<1440*20;i++)
+	{
+		*((char *)addr+0)=(char)0xff;
+		*((char *)addr+1)=(char)0xff;
+		*((char *)addr+2)=(char)0xff;
+		*((char *)addr+3)=(char)0x00;	
+		addr +=1;	
+	}
+
+	while(1)
+		;
+}
+```
+

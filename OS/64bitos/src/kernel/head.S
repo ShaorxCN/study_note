@@ -85,7 +85,7 @@ __PDPTE:
 
 .org	0x3000
 
-// page directory entry 页表目录项       这里bit[7]都是1 那就是2Mb的中页 PED中拆解出的就是实际物理地址
+// page directory entry 页表目录项       这里bit[7]都是1 那就是2Mb的中页 PDE中拆解出的就是实际物理地址
 __PDE:
 
 	.quad	0x000083	
