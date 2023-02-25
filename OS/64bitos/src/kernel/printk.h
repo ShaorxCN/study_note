@@ -17,7 +17,7 @@
 
 #define WHITE 	0x00ffffff		//白
 #define BLACK 	0x00000000		//黑
-#define RED	0x00ff0000		//红
+#define RED	    0x00ff0000		//红
 #define ORANGE	0x00ff8000		//橙
 #define YELLOW	0x00ffff00		//黄
 #define GREEN	0x0000ff00		//绿
@@ -33,17 +33,22 @@ extern unsigned char font_ascii[256][16];
 
 char buf[4096]={0};
 
+// 记录分辨率 光标位置 字符像素矩阵尺寸 帧缓存区起始地址和容量大小的结构
 struct position
 {
-	int XResolution;
+	// 分辨率 1440*900
+	int XResolution; 
 	int YResolution;
 
+	// 光标位置
 	int XPosition;
 	int YPosition;
-
+	
+	// 矩阵大小
 	int XCharSize;
 	int YCharSize;
 
+	// 其实地址和容量
 	unsigned int * FB_addr;
 	unsigned long FB_length;
 }Pos;
