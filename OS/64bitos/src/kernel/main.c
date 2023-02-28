@@ -1,3 +1,6 @@
+#include "lib.h"
+#include "printk.h"
+
 void Start_Kernel(void)
 {
 	// header.S 中将帧缓存的物理地址(0xe0000000) 映射到0xffff800000a00000和0xa00000处
@@ -7,6 +10,17 @@ void Start_Kernel(void)
 	int *addr = (int *)0xffff800000a00000;
 	int i;
 
+	Pos.XResolution = 1440;
+	Pos.YResolution = 900;
+
+	Pos.XPosition = 0;
+	Pos.YPosition = 0;
+
+	Pos.XCharSize = 8;
+	Pos.YCharSize = 16;
+
+	Pos.FB_addr = (int *)0xffff800000a00000;
+	Pos.FB_length = (Pos.XResolution * Pos.YResolution * 4);
 
 	for(i = 0 ;i<1440*20;i++)
 	{
@@ -40,7 +54,11 @@ void Start_Kernel(void)
 		*((char *)addr+3)=(char)0x00;	
 		addr +=1;	
 	}
+
+	color_printk(YELLOW,BLACK,"Hello\t\t World!\n");
 
 	while(1)
 		;
 }
+
+

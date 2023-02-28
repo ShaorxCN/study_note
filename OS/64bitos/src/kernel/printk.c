@@ -1,12 +1,13 @@
 #include <stdarg.h>
+#include <stddef.h>
 #include "printk.h"
 #include "lib.h"
 #include "linkage.h"
 
 /*
-
+	输出指定字符
+	帧起始地址，分辨率x,打印矩阵的x和y开始地址  字符颜色，背景色，字符
 */
-
 void putchar(unsigned int * fb,int Xsize,int x,int y,unsigned int FRcolor,unsigned int BKcolor,unsigned char font)
 {
 	int i = 0,j = 0;
@@ -14,14 +15,14 @@ void putchar(unsigned int * fb,int Xsize,int x,int y,unsigned int FRcolor,unsign
 	unsigned char * fontp = NULL;
 	int testval = 0;
 	fontp = font_ascii[font];
-
+	// 16行
 	for(i = 0; i< 16;i++)
 	{
 		addr = fb + Xsize * ( y + i ) + x;
-		testval = 0x100;
+		testval = 0x100; // 0001 0000 0000 下面先右移 也就是 0000 1000 0000 就是从bit[8]开始看有没有1 一位一位的看
 		for(j = 0;j < 8;j ++)		
 		{
-			testval = testval >> 1;
+			testval = testval >> 1;   
 			if(*fontp & testval)
 				*addr = FRcolor;
 			else
@@ -34,30 +35,31 @@ void putchar(unsigned int * fb,int Xsize,int x,int y,unsigned int FRcolor,unsign
 
 
 /*
-
+	转换为int
 */
 
 int skip_atoi(const char **s)
 {
 	int i=0;
-
+	// 如果是数字则该值=前值*10加后值
+	// s++ 先取值再++
 	while (is_digit(**s))
 		i = i*10 + *((*s)++) - '0';
 	return i;
 }
 
 /*
-
+	字母转换为指定进制规格的字符串 base进制(2-36) size长度  precision精度 type格式控制
 */
 
-static char * number(char * str, long num, int base, int size, int precision,	int type)
+static char * number(char * str, long num, int base, int size, int precision, int type)
 {
 	char c,sign,tmp[50];
 	const char *digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	int i;
 
 	if (type&SMALL) digits = "0123456789abcdefghijklmnopqrstuvwxyz";
-	if (type&LEFT) type &= ~ZEROPAD;
+	if (type&LEFT) type &= ~ZEROPAD;  // 左对齐无0填充
 	if (base < 2 || base > 36)
 		return 0;
 	c = (type & ZEROPAD) ? '0' : ' ' ;
@@ -106,7 +108,7 @@ static char * number(char * str, long num, int base, int size, int precision,	in
 
 
 /*
-
+	解析格式 返回实际元素个数
 */
 
 int vsprintf(char * buf,const char *fmt, va_list args)
@@ -119,9 +121,10 @@ int vsprintf(char * buf,const char *fmt, va_list args)
 
 	int qualifier;		/* 'h', 'l', 'L' or 'Z' for integer fields */
 
+	// 解析格式化字符串
 	for(str = buf; *fmt; fmt++)
 	{
-
+		// 检查占位符
 		if(*fmt != '%')
 		{
 			*str++ = *fmt;
@@ -130,6 +133,7 @@ int vsprintf(char * buf,const char *fmt, va_list args)
 		flags = 0;
 		repeat:
 			fmt++;
+			// 标志格式占位符解析
 			switch(*fmt)
 			{
 				case '-':flags |= LEFT;	
@@ -294,7 +298,9 @@ int vsprintf(char * buf,const char *fmt, va_list args)
 }
 
 /*
-
+	FRcolor： 前景色/字体颜色
+	BKcolor: 背景色
+	fmt    : 格式化字符串
 */
 
 int color_printk(unsigned int FRcolor,unsigned int BKcolor,const char * fmt,...)
@@ -305,6 +311,7 @@ int color_printk(unsigned int FRcolor,unsigned int BKcolor,const char * fmt,...)
 	va_list args;
 	va_start(args, fmt);
 
+	// 解析格式 
 	i = vsprintf(buf,fmt, args);
 
 	va_end(args);
@@ -327,6 +334,7 @@ int color_printk(unsigned int FRcolor,unsigned int BKcolor,const char * fmt,...)
 			Pos.XPosition--;
 			if(Pos.XPosition < 0)
 			{
+				// 这里逻辑是退行 如果y也小于0则是最后一行
 				Pos.XPosition = (Pos.XResolution / Pos.XCharSize - 1) * Pos.XCharSize;
 				Pos.YPosition--;
 				if(Pos.YPosition < 0)
