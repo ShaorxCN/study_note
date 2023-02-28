@@ -8,8 +8,8 @@ all: system
 
 # 链接 -b 指定obj文件格式
 # -T 指定连接脚本文件
-system:	head.o main.o 
-	ld -b elf64-x86-64 -o system head.o main.o -T Kernel.lds 
+system:	head.o main.o printk.o
+	ld -b elf64-x86-64 -z muldefs -o system head.o main.o printk.o -T Kernel.lds 
 
 head.o:	head.S
 # -E表示仅预处理 不执行编译汇编或者链接 预处理 编译生成汇编代码一类  汇编生成obj
@@ -21,6 +21,9 @@ head.o:	head.S
 # -c 编译汇编 但是不链接
 main.o:	main.c
 	gcc  -mcmodel=large -fno-builtin -m64 -c main.c
+
+printk.o:	printk.c
+	gcc  -mcmodel=large -fno-builtin -m64 -c printk.c
 
 clean:
 	rm -rf *.o *.s~ *.s *.S~ *.c~ *.h~ system  Makefile~ Kernel.lds~ kernel.bin 

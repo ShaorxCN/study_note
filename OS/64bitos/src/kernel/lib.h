@@ -8,7 +8,7 @@
     执行一次ecx-1 初始时0xffffffff 所以取反再减一就是长度 notl和decl(例如两次 变成fffffffd 取反00000002 减去1（'0'本身）就是1)
 */
 
-inline int strlen(char * String)
+static inline int strlen(char * String)
 {
     // register 关键字说明后面的变量访问频率较高 告诉编译器尽量将他存储在寄存器中
 	register int __res;
