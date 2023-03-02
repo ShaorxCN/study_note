@@ -2,7 +2,6 @@
 #include <stddef.h>
 #include "printk.h"
 #include "lib.h"
-#include "linkage.h"
 
 /*
 	输出指定字符

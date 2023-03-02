@@ -51,13 +51,147 @@ entry64:
 	movq	%rax,	%ss
 	movq	$0xffff800000007E00,	%rsp		/* rsp address */
 
+// 设置IDT  256*16B
+/*
+leaq 从目标内存地址load 64bit给rdx 这里也就是将ignore_int 模块加载进来 rdx:rax 分别是高8B和低8B
+其中bit0-15 是Offset 1/3
+    bit 16-31 segment selector
+	32-34 IST中断栈表index
+	40-43 GATE type  这里再长模式下 只有两种 0xE/b1110 中断门 这里就是  0xF 0b1111 陷阱门
+	44 默认0
+	46-45 DPL 标志特权级。这里和默认0组成了8 b1000的000 部分 也就是最高特权级
+	47 P 是否有效 这里1 有效组成了8 b1000的1
+	63-48 offset 2/3
+	95-64 offset 3/3
+	127-96 保留
+*/
+setup_IDT:							
+	leaq	ignore_int(%rip),	%rdx             
+	movq	$(0x08 << 16),	%rax           // ax清零
+	movw	%dx,	%ax                    // 赋值offset 
+	movq	$(0x8E00 << 32),	%rcx	   // E赋值的GATE TYPE 中断门
+	addq	%rcx,	%rax                   // 组成
+	movl	%edx,	%ecx
+	shrl	$16,	%ecx
+	shlq	$48,	%rcx
+	addq	%rcx,	%rax
+	shrq	$32,	%rdx
+	leaq	IDT_Table(%rip),	%rdi
+	mov	$256,	%rcx
+rp_sidt:
+	movq	%rax,	(%rdi)              // rdi间接寻址 复制rax过去
+	movq	%rdx,	8(%rdi)             // 8+rdi的间接寻址 等于初始化一个了
+	addq	$0x10,	%rdi                // 下16B的位置 也就是表项2的位置
+	dec	%rcx
+	jne	rp_sidt                         // 循环初始化256个表项
+
+// 初始化TSS结构 这里因为本身就是0特权级 不会产生切换。这里直接ltr装载了
+setup_TSS64:
+	leaq	TSS64_Table(%rip),	%rdx
+	xorq	%rax,	%rax
+	xorq	%rcx,	%rcx
+	movq	$0x89,	%rax
+	shlq	$40,	%rax
+	movl	%edx,	%ecx
+	shrl	$24,	%ecx
+	shlq	$56,	%rcx
+	addq	%rcx,	%rax
+	xorq	%rcx,	%rcx
+	movl	%edx,	%ecx
+	andl	$0xffffff,	%ecx
+	shlq	$16,	%rcx
+	addq	%rcx,	%rax
+	addq	$103,	%rax
+	leaq	GDT_Table(%rip),	%rdi
+	movq	%rax,	64(%rdi)
+	shrq	$32,	%rdx
+	movq	%rdx,	72(%rdi)
+
+	mov	$0x40,	%ax
+	ltr	%ax
+
 	movq	go_to_kernel(%rip),	%rax		/* movq address */
-	pushq	$0x08                           // 代表index 1
+	pushq	$0x08
 	pushq	%rax
-	lretq                                    // 等价于pop rip ,pop cs selector 这里rax先出 定位到go_to_kernel 然后是0x08 代表的选择子
+	lretq
+
+	// movq	go_to_kernel(%rip),	%rax		/* movq address */
+	// pushq	$0x08                           // 代表index 1
+	// pushq	%rax
+	// lretq                                    // 等价于pop rip ,pop cs selector 这里rax先出 定位到go_to_kernel 然后是0x08 代表的选择子
 
 go_to_kernel:
 	.quad	Start_Kernel
+//=======	ignore_int
+// 中断处理程序内容
+// 这里为color_printk 准备参数
+// 在x64模式下，大部分编译器采用寄存器传递参数，参数按照从左向右的顺序依次是RDI、RSI、RDX、RCX、R8、R9，
+// 剩余参数使用内存传递方式，RAX放置函数的返回值，调用者负责平衡栈。
+ignore_int:
+	cld
+	pushq	%rax
+	pushq	%rbx
+	pushq	%rcx
+	pushq	%rdx
+	pushq	%rbp
+	pushq	%rdi
+	pushq	%rsi
+
+	pushq	%r8
+	pushq	%r9
+	pushq	%r10
+	pushq	%r11
+	pushq	%r12
+	pushq	%r13
+	pushq	%r14
+	pushq	%r15
+
+	movq	%es,	%rax
+	pushq	%rax
+	movq	%ds,	%rax
+	pushq	%rax
+
+	movq	$0x10,	%rax
+	movq	%rax,	%ds
+	movq	%rax,	%es
+
+	leaq	int_msg(%rip),	%rax			/* leaq get address */
+	pushq	%rax
+	movq	%rax,	%rdx               // 字符串地址
+	movq	$0x00000000,	%rsi       // 背景色 黑底
+	movq	$0x00ff0000,	%rdi      //前景色 红字
+	movq	$0,	%rax                  // 存放函数返回值
+	callq	color_printk
+	addq	$0x8,	%rsp
+
+Loop:
+	jmp	Loop	
+
+	popq	%rax
+	movq	%rax,	%ds
+	popq	%rax
+	movq	%rax,	%es
+
+	popq	%r15
+	popq	%r14
+	popq	%r13
+	popq	%r12
+	popq	%r11
+	popq	%r10
+	popq	%r9
+	popq	%r8
+
+	popq	%rsi
+	popq	%rdi
+	popq	%rbp
+	popq	%rdx
+	popq	%rcx
+	popq	%rbx
+	popq	%rax
+	iretq
+
+int_msg:
+	.asciz "Unknown interrupt or fault at RIP\n"
 //=======	init page  初始化页表
 .align 8                               // 8字节对齐
 // 确定该结构存放在段的相对偏移0x1000处（相对上面的.text）  .org new-lc , fill 如果作用填充当前位置到新位置 不能跨段
