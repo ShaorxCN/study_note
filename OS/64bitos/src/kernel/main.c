@@ -1,4 +1,3 @@
-#include "lib.h"
 #include "printk.h"
 
 void Start_Kernel(void)

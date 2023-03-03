@@ -237,7 +237,7 @@ void Start_Kernel(void)
 
 其中跳转之前 会检查特权级。如果处理程序所在代码段的特权级高于当前代码段，那么就会切换栈空间.其中切换栈空间步骤如下:
 1. 从任务状态段TSS中取出对应特权级的栈段选择子和栈指针。将他们作为中断/异常处理程序的栈空间进行切换。会把切换前的SS ESP寄存器值压入处理。
-2. 保存中断程序的EFLAGS,CS和EIP寄存器入栈
+2. 保存被中断程序的EFLAGS,CS和EIP寄存器入栈
 3. 如果产生错误码 错误码也入栈  （分别是SS ESP EFLAGS CS EIP ERRORCODE 入栈）
    
 <img src="./img/IDT_switch_stack.png">
