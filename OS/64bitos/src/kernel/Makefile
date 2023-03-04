@@ -8,13 +8,16 @@ all: system
 
 # 链接 -b 指定obj文件格式
 # -T 指定连接脚本文件
-system:	head.o main.o printk.o
-	ld -b elf64-x86-64 -z muldefs -o system head.o main.o printk.o -T Kernel.lds 
+system:	head.o entry.o main.o printk.o trap.o
+	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o main.o printk.o trap.o -T Kernel.lds 
 
 head.o:	head.S
 # -E表示仅预处理 不执行编译汇编或者链接 预处理 编译生成汇编代码一类  汇编生成obj
 	gcc -E  head.S > head.s
 	as --64 -o head.o head.s
+entry.o: entry.S
+	gcc -E  entry.S > entry.s
+	as --64 -o entry.o entry.s
 # -fno-builtin 是指忽略和内建函数冲突	
 # -m64 只x86-64下 设置int 32bit long pointer 64bit
 # -mcmodel=large 告诉编译器 该obj文件可能被链接到大于4g的程序中 所以使用虽慢但是安全的绝对寻址？
@@ -24,6 +27,7 @@ main.o:	main.c
 
 printk.o:	printk.c
 	gcc  -mcmodel=large -fno-builtin -m64 -c printk.c
-
+trap.o: trap.c
+	gcc  -mcmodel=large -fno-builtin -m64 -c trap.c
 clean:
 	rm -rf *.o *.s~ *.s *.S~ *.c~ *.h~ system  Makefile~ Kernel.lds~ kernel.bin 
