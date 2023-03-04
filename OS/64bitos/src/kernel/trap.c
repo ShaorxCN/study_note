@@ -46,3 +46,72 @@ void do_nmi(unsigned long rsp,unsigned long error_code)
     color_printk(RED,BLACK,"do_nmi(2),ERROR_CODE:%#018lx,RSP:%#018lx,RIP:%#018lx\n",error_code , rsp , *p);
     while(1);
 }
+
+// #TS处理函数
+void do_invalid_TSS(unsigned long rsp,unsigned long error_code)
+{
+    unsigned long * p=NULL;
+    p = (unsigned long *)(rsp+0x98);
+
+    color_printk(RED,BLACK,"do_invalid_TSS(10),ERROR_CODE:%#018lx,RSP:%#018lx,RIP:%#018lx\n",error_code , rsp , *p);
+
+    // 判断是否是关联外部
+    if(error_code&0x01)
+        color_printk(RED,BLACK,"The exception occurred during delivery of an event external to the program,such as an interrupt or an earlier exception.\n");
+    // 判断是否是是IDT内异常
+    if(error_code&0x02)
+        color_printk(RED,BLACK,"Refers to a gate descriptor in the IDT;\n");
+    else
+        color_printk(RED,BLACK,"Refers to a descriptor  in the GDT or the current LDT;\n");
+
+    // 判断如果非IDT 是LDT还是LDT
+    if((error_code & 0x02) == 0)
+        // TI 1 则是LDT
+        if(error_code & 0x04)
+            color_printk(RED,BLACK,"Refers to a segment or gate descriptor in the LDT;\n");
+        else
+            color_printk(RED,BLACK,"Refers to a descriptor in the current GDT;\n");
+
+    color_printk(RED,BLACK,"Segment Selector Index:%#010x\n",error_code & 0xfff8);
+
+    while(1);
+}
+
+
+// #PF 处理函数
+void do_page_fault(unsigned long rsp,unsigned long error_code)
+{
+    unsigned long *p = NULL;
+    // 保存出错的线性地址
+    unsigned long cr2 = 0;
+    // 获取出错地址
+     __asm__    __volatile__("movq    %%cr2,    %0":"=r"(cr2)::"memory");
+
+    p = (unsigned long *)(rsp + 0x98);
+    color_printk(RED,BLACK,"do_page_fault(14),ERROR_CODE:%#018lx,RSP:%#018lx,RIP:%#018lx\n",error_code , rsp , *p);
+
+    if(!(error_code & 0x01))
+        color_printk(RED,BLACK,"Page Not-Present,\t");
+
+    if(error_code & 0x02)
+        color_printk(RED,BLACK,"Write Cause Fault,\t");
+    else
+        color_printk(RED,BLACK,"Read Cause Fault,\t");
+
+    if(error_code & 0x04)
+        color_printk(RED,BLACK,"Fault in user(3)\t");
+    else
+        color_printk(RED,BLACK,"Fault in supervisor(0,1,2)\t");
+
+    if(error_code & 0x08)
+        color_printk(RED,BLACK,",Reserved Bit Cause Fault\t");
+
+    if(error_code & 0x10)
+        color_printk(RED,BLACK,",Instruction fetch Cause Fault");
+
+    color_printk(RED,BLACK,"\n");
+    color_printk(RED,BLACK,"CR2:%#018lx\n",cr2);
+
+    while(1);
+
+}
