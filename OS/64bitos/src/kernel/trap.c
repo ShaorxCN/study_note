@@ -27,8 +27,6 @@ void sys_vector_init()
 	set_trap_gate(19,1,SIMD_exception);
 	set_trap_gate(20,1,virtualization_exception);
 
-	set_system_gate(SYSTEM_CALL_VECTOR,7,system_call);
-
 }
 
 
