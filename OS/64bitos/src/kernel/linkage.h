@@ -19,7 +19,7 @@
 
 
 /*
-
+  标注全局符号名
 */
 
 #define ENTRY(name)		\
