@@ -107,8 +107,9 @@ setup_TSS64:
 	shrq	$32,	%rdx
 	movq	%rdx,	72(%rdi)
 
-	mov	$0x40,	%ax
-	ltr	%ax
+	// 和main中的load_TR重复 报错 导致init失败 所以先注释掉
+	// mov	$0x40,	%ax
+	// ltr	%ax
 
 	movq	go_to_kernel(%rip),	%rax		/* movq address */
 	pushq	$0x08
