@@ -1,5 +1,4 @@
 #include <stdarg.h>
-#include <stddef.h>
 #include "printk.h"
 #include "lib.h"
 

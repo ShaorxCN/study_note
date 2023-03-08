@@ -2,6 +2,9 @@
 #include "gate.h"
 #include "trap.h"
 #include "printk.h"
+#include "memory.h"
+
+struct Global_Memory_Descriptor memory_management_strcut = {{0},0};
 
 void Start_Kernel(void)
 {
@@ -64,11 +67,12 @@ void Start_Kernel(void)
         0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00);
 
     sys_vector_init();
+	color_printk(RED,BLACK,"memory init \n");
+	init_memory();
 
-    i = 1/0;
+    // i = 1/0;
     // i = *(int *)0xffff80000aa00000;
-
-
+	
 	while(1)
 		;
 }

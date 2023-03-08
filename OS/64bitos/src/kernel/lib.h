@@ -1,3 +1,8 @@
+#ifndef __LIB_H__
+#define __LIB_H__
+
+
+#define NULL 0
 /*
 	计算字符串长度
     cld df=0 控制内存地址向高位递增
@@ -22,3 +27,4 @@ static inline int strlen(char * String)
 				);
 	return __res;
 }
+#endif

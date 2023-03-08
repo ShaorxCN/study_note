@@ -3,8 +3,7 @@
 #define __TRAP_H__
 
 #include "printk.h"
-
-
+#include "lib.h"
 
 
  void divide_error();
