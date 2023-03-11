@@ -36,10 +36,6 @@ static inline int strlen(char *String)
 		"1"(Address) 指定了di 目标
 
 		先默认8  按照最大的8执行赋值 剩下的慢慢判断执行 count=8*cx+n n再决定执行什么指令
-
-		cld
-		rep stosq
-		testb &4,%b3
 */
 
 static inline void *memset(void *Address, unsigned char C, long Count)

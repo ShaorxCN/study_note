@@ -49,16 +49,48 @@ struct Global_Memory_Descriptor
 
     struct Page *pages_struct;  // 页数组指针
     unsigned long page_size;    // 结构体总数
-    unsigned long pages_length; // 数组长度
+    unsigned long pages_length; // 数组占用内存长度
 
     struct Zone *zones_struct;  // zone数组指针
     unsigned long zones_size;   // zone结构体数量
-    unsigned long zones_length; // 数组长度
+    unsigned long zones_length; // 数组占用内存长度
 
     unsigned long start_code, end_code, end_data, end_brk; // 内核程序的起始代码段地址/结束地址/结束数据段地址/内核程序的结束地址
 
     unsigned long end_of_struct; // 内存页管理结构的结尾地址
 };
+
+////struct page attribute (alloc_pages flags)
+
+//
+#define PG_PTable_Maped (1 << 0)
+
+//
+#define PG_Kernel_Init (1 << 1)
+
+//
+#define PG_Referenced (1 << 2)
+
+//
+#define PG_Dirty (1 << 3)
+
+//
+#define PG_Active (1 << 4)
+
+//
+#define PG_Up_To_Date (1 << 5)
+
+//
+#define PG_Device (1 << 6)
+
+//
+#define PG_Kernel (1 << 7)
+
+//
+#define PG_K_Share_To_U (1 << 8)
+
+//
+#define PG_Slab (1 << 9)
 
 struct Page
 {
@@ -68,6 +100,14 @@ struct Page
     unsigned long reference_count; // 该页的引用次数
     unsigned long age;             // 该页的创建时间
 };
+
+//// each zone index
+// 先映射4g 内存?
+int ZONE_DMA_INDEX = 0;
+int ZONE_NORMAL_INDEX = 0;  // low 1GB RAM ,was mapped in pagetable
+int ZONE_UNMAPED_INDEX = 0; // above 4GB? RAM,unmapped in pagetable
+
+#define MAX_NR_ZONES 10 // max zone
 
 struct Zone
 {
@@ -85,6 +125,36 @@ struct Zone
     unsigned long total_pages_link; // 区域内页被引用次数  可能一个物理页被映射到多个虚拟地址/线性地址
 };
 
-extern struct Global_Memory_Descriptor memory_management_strcut;
+extern struct Global_Memory_Descriptor memory_management_struct;
 
+/*
+
+*/
+
+#define flush_tlb()               \
+    do                            \
+    {                             \
+        unsigned long tmpreg;     \
+        __asm__ __volatile__(     \
+            "movq	%%cr3,	%0	\n\t" \
+            "movq	%0,	%%cr3	\n\t" \
+            : "=r"(tmpreg)        \
+            :                     \
+            : "memory");          \
+    } while (0)
+
+/*
+
+*/
+
+inline unsigned long *Get_gdt()
+{
+    unsigned long *tmp;
+    __asm__ __volatile__(
+        "movq	%%cr3,	%0	\n\t"
+        : "=r"(tmp)
+        :
+        : "memory");
+    return tmp;
+}
 #endif
