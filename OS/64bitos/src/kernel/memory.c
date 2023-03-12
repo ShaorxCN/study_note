@@ -29,6 +29,106 @@ unsigned long page_init(struct Page *page, unsigned long flags)
     return 0;
 }
 
+/*
+    从指定zone类型zone中获取number个页 并赋属性 不能跨zone
+
+    number: number < 64
+
+    zone_select: zone select from dma , mapped in  pagetable , unmapped in pagetable
+
+    page_flags: struct Page flages
+
+*/
+
+struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
+{
+    int i;
+    unsigned long page = 0;
+
+    int zone_start = 0;
+    int zone_end = 0;
+
+    switch (zone_select)
+    {
+    case ZONE_DMA:
+        zone_start = 0;
+        zone_end = ZONE_DMA_INDEX;
+
+        break;
+
+    case ZONE_NORMAL:
+        zone_start = ZONE_DMA_INDEX;
+        zone_end = ZONE_NORMAL_INDEX;
+
+        break;
+
+    case ZONE_UNMAPED:
+        zone_start = ZONE_UNMAPED_INDEX;
+        zone_end = memory_management_struct.zones_size - 1;
+
+        break;
+
+    default:
+        color_printk(RED, BLACK, "alloc_pages error zone_select index\n");
+        return NULL;
+        break;
+    }
+
+    for (i = zone_start; i <= zone_end; i++)
+    {
+        struct Zone *z;
+        unsigned long j;
+        unsigned long start, end, length;
+        unsigned long tmp;
+
+        if ((memory_management_struct.zones_struct + i)->page_free_count < number)
+            continue;
+
+        z = memory_management_struct.zones_struct + i;
+        start = z->zone_start_address >> PAGE_2M_SHIFT; // 起始地址对应的页index
+        end = z->zone_end_address >> PAGE_2M_SHIFT;
+        length = z->zone_length >> PAGE_2M_SHIFT;
+
+        // 位图位图检索次数 第多少页模64得出某个unsinged long中得位置 tmp就是这个bitsmap中剩下得
+        tmp = 64 - start % 64;
+
+        // 这里如果有余数说明还是那个没遍历完得map  否则就是后面那个新的map 大的层级 如果不是正好 那就第一次补全64算 后面都是完整的long
+        //  按照bitsmap算 里面得k再遍历map里得每个page 但是其实就一次循环？这里最多申请64个页 内部得for直接goto return了
+        for (j = start; j <= end; j += j % 64 ? tmp : 64)
+        {
+            unsigned long *p = memory_management_struct.bits_map + (j >> 6);
+            unsigned long shift = j % 64; // 对应开始页的模64 找到单个位图中的offset
+            unsigned long k;
+            // 这里和外部得循环实际是看有没有连续得number个 如果第一次就分配成功 直接goto return了
+            for (k = shift; k < 64 - shift; k++)
+            {
+                // 简化就是 !(a&b)   a：先获取64个bit位 (说明就是申请64个?)b:是申请64个吗？是的话就是全部要0 否则就是对应得1（因为左移得范围是0-63 如果64就需要单独处理） 反正就是吧需要得个数位置都置1
+                // 那么如果a是0 也就是都没占用 那么a&b就是0 ！进入逻辑
+                if (!(((*p >> k) | (*(p + 1) << (64 - k))) & (number == 64 ? 0xffffffffffffffffUL : ((1UL << number) - 1))))
+                {
+                    unsigned long l;
+                    // page 是zone开始的index+实际开始的offset-1 第一次如果shift!=0 的话是不是浪费了？ k-shift?
+                    // 针对整个page_struct的偏移
+                    page = j + k - 1;
+                    for (l = 0; l < number; l++)
+                    {
+
+                        struct Page *x = memory_management_struct.pages_struct + page + l;
+                        page_init(x, page_flags);
+                    }
+                    goto find_free_pages;
+                }
+            }
+        }
+    }
+
+    return NULL;
+
+find_free_pages:
+
+    return (struct Page *)(memory_management_struct.pages_struct + page);
+}
+
 // 获取内存信息
 void init_memory()
 {
@@ -82,7 +182,7 @@ void init_memory()
     TotalMem = memory_management_struct.e820[memory_management_struct.e820_length].address + memory_management_struct.e820[memory_management_struct.e820_length].length;
 
     // 初始化位图 内核程序结束向上对齐后的位置
-    memory_management_struct.bits_map = (unsigned long)((memory_management_struct.end_brk + PAGE_4K_SIZE - 1) & PAGE_4K_MASK);
+    memory_management_struct.bits_map = (unsigned long *)((memory_management_struct.end_brk + PAGE_4K_SIZE - 1) & PAGE_4K_MASK);
     memory_management_struct.bits_size = TotalMem >> PAGE_2M_SHIFT;
     // long 64bit 8字节。这里计算多少个2M物理页 然后按照8字节/指针大小向上对齐 计算
     memory_management_struct.bits_length = (((unsigned long)(TotalMem >> PAGE_2M_SHIFT) + sizeof(long) * 8 - 1) / 8) & (~(sizeof(long) - 1));
@@ -204,103 +304,4 @@ void init_memory()
         *(Phy_To_Virt(Global_CR3) + i) = 0UL;
 
     flush_tlb();
-}
-
-/*
-    从指定zone类型zone中获取number个页 并赋属性 不能跨zone
-
-    number: number < 64
-
-    zone_select: zone select from dma , mapped in  pagetable , unmapped in pagetable
-
-    page_flags: struct Page flages
-
-*/
-
-struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
-{
-    int i;
-    unsigned long page = 0;
-
-    int zone_start = 0;
-    int zone_end = 0;
-
-    switch (zone_select)
-    {
-    case ZONE_DMA:
-        zone_start = 0;
-        zone_end = ZONE_DMA_INDEX;
-
-        break;
-
-    case ZONE_NORMAL:
-        zone_start = ZONE_DMA_INDEX;
-        zone_end = ZONE_NORMAL_INDEX;
-
-        break;
-
-    case ZONE_UNMAPED:
-        zone_start = ZONE_UNMAPED_INDEX;
-        zone_end = memory_management_struct.zones_size - 1;
-
-        break;
-
-    default:
-        color_printk(RED, BLACK, "alloc_pages error zone_select index\n");
-        return NULL;
-        break;
-    }
-
-    for (i = zone_start; i <= zone_end; i++)
-    {
-        struct Zone *z;
-        unsigned long j;
-        unsigned long start, end, length;
-        unsigned long tmp;
-
-        if ((memory_management_struct.zones_struct + i)->page_free_count < number)
-            continue;
-
-        z = memory_management_struct.zones_struct + i;
-        start = z->zone_start_address >> PAGE_2M_SHIFT; // 起始地址对应的页index
-        end = z->zone_end_address >> PAGE_2M_SHIFT;
-        length = z->zone_length >> PAGE_2M_SHIFT;
-
-        // 位图位图检索次数 第多少页模64得出某个unsinged long中得位置 tmp就是这个bitsmap中剩下得
-        tmp = 64 - start % 64;
-
-        // 这里如果有余数说明还是那个没遍历完得map  否则就是后面那个新的map 大的层级 如果不是正好 那就第一次补全64算 后面都是完整的long
-        //  按照bitsmap算 里面得k再遍历map里得每个page 但是其实就一次循环？这里最多申请64个页 内部得for直接goto return了
-        for (j = start; j <= end; j += j % 64 ? tmp : 64)
-        {
-            unsigned long *p = memory_management_struct.bits_map + (j >> 6);
-            unsigned long shift = j % 64; // 对应开始页的模64 找到单个位图中的offset
-            unsigned long k;
-            // 这里和外部得循环实际是看有没有连续得number个 如果第一次就分配成功 直接goto return了
-            for (k = shift; k < 64 - shift; k++)
-            {
-                // 简化就是 !(a&b)   a：先获取64个bit位 b:是申请64个吗？是的话就是全部要0 否则就是对应得1（因为左移得范围是0-63 如果64就需要单独处理） 反正就是吧需要得个数位置都置1
-                // 那么如果a是0 也就是都没占用 那么a&b就是0 ！进入逻辑
-                if (!(((*p >> k) | (*(p + 1) << (64 - k))) & (number == 64 ? 0xffffffffffffffffUL : ((1UL << number) - 1))))
-                {
-                    unsigned long l;
-                    // page 是zone开始的index+实际开始的offset-1 第一次如果shift!=0 的话是不是浪费了？ k-shift?
-                    page = j + k - 1;
-                    for (l = 0; l < number; l++)
-                    {
-
-                        struct Page *x = memory_management_struct.pages_struct + page + l;
-                        page_init(x, page_flags);
-                    }
-                    goto find_free_pages;
-                }
-            }
-        }
-    }
-
-    return NULL;
-
-find_free_pages:
-
-    return (struct Page *)(memory_management_struct.pages_struct + page);
 }

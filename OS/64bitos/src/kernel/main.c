@@ -10,7 +10,7 @@ extern char _etext;
 extern char _edata;
 extern char _end;
 
-struct Global_Memory_Descriptor memory_management_strcut = {{0}, 0};
+struct Global_Memory_Descriptor memory_management_struct = {{0}, 0};
 
 void Start_Kernel(void)
 {
@@ -77,10 +77,10 @@ void Start_Kernel(void)
 
 	// lds文件中将位置值赋给了这些_xxx 相比较c c中变量会变成符号表 然后去找符号表中的地址 int * a = &test 就是直接吧符号表中test保存的地址给a
 	// 对应lds文件中  _xxx 中的值就是对应的地址（不用再间接寻址了） &_xxx 就是他的值
-	memory_management_strcut.start_code = (unsigned long)&_text;
-	memory_management_strcut.end_code = (unsigned long)&_etext;
-	memory_management_strcut.end_data = (unsigned long)&_edata;
-	memory_management_strcut.end_brk = (unsigned long)&_end;
+	memory_management_struct.start_code = (unsigned long)&_text;
+	memory_management_struct.end_code = (unsigned long)&_etext;
+	memory_management_struct.end_data = (unsigned long)&_edata;
+	memory_management_struct.end_brk = (unsigned long)&_end;
 	color_printk(RED, BLACK, "memory init \n");
 	init_memory();
 

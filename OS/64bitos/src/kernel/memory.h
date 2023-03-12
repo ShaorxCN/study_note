@@ -138,8 +138,9 @@ struct Zone
     unsigned long total_pages_link; // 区域内页被引用次数  可能一个物理页被映射到多个虚拟地址/线性地址
 };
 
-struct Global_Memory_Descriptor memory_management_struct;
-
+extern struct Global_Memory_Descriptor memory_management_struct;
+struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags);
+void init_memory();
 /*
     刷新tlb  x86下当对cr3写入值得时候会自动刷新
 */
