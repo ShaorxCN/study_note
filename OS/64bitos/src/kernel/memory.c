@@ -74,6 +74,7 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
         break;
     }
 
+    // zone开头必定是该zone的page 0
     for (i = zone_start; i <= zone_end; i++)
     {
         struct Zone *z;
@@ -85,9 +86,9 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
             continue;
 
         z = memory_management_struct.zones_struct + i;
-        start = z->zone_start_address >> PAGE_2M_SHIFT; // 起始地址对应的页index
+        start = z->zone_start_address >> PAGE_2M_SHIFT; // 连续无空洞的话  起始地址对应的页index
         end = z->zone_end_address >> PAGE_2M_SHIFT;
-        length = z->zone_length >> PAGE_2M_SHIFT;
+        length = z->zone_length >> PAGE_2M_SHIFT; // 该zone总归多少页
 
         // 位图位图检索次数 第多少页模64得出某个unsinged long中得位置 tmp就是这个bitsmap中剩下得
         tmp = 64 - start % 64;
@@ -107,7 +108,7 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
                 if (!(((*p >> k) | (*(p + 1) << (64 - k))) & (number == 64 ? 0xffffffffffffffffUL : ((1UL << number) - 1))))
                 {
                     unsigned long l;
-                    // page 是zone开始的index+实际开始的offset-1 第一次如果shift!=0 的话是不是浪费了？ k-shift?
+                    // page 是zone开始的index+实际开始的offset-1  页归属于一个zone所以j必定是某个zone index
                     // 针对整个page_struct的偏移
                     page = j + k - 1;
                     for (l = 0; l < number; l++)
@@ -188,7 +189,7 @@ void init_memory()
     memory_management_struct.bits_length = (((unsigned long)(TotalMem >> PAGE_2M_SHIFT) + sizeof(long) * 8 - 1) / 8) & (~(sizeof(long) - 1));
     memset(memory_management_struct.bits_map, 0xff, memory_management_struct.bits_length);
 
-    // 初始化页结构指针
+    // 初始化页结构指针 这里的pages_size 包括内存空洞
     memory_management_struct.pages_struct = (struct Page *)(((unsigned long)memory_management_struct.bits_map + memory_management_struct.bits_length + PAGE_4K_SIZE - 1) & PAGE_4K_MASK);
     memory_management_struct.pages_size = TotalMem >> PAGE_2M_SHIFT;
     memory_management_struct.pages_length = ((TotalMem >> PAGE_2M_SHIFT) * sizeof(struct Page) + sizeof(long) - 1) & (~(sizeof(long) - 1));
@@ -211,6 +212,7 @@ void init_memory()
 
         if (memory_management_struct.e820[i].type != 1)
             continue;
+        // 对齐过的
         start = PAGE_2M_ALIGN(memory_management_struct.e820[i].address);
         end = ((memory_management_struct.e820[i].address + memory_management_struct.e820[i].length) >> PAGE_2M_SHIFT) << PAGE_2M_SHIFT;
         if (end <= start)
@@ -251,7 +253,7 @@ void init_memory()
         }
     }
 
-    // 这里因为page 0 是包含系统的  所以需要单独初始化
+    // 这里因为page 0 是包含系统的  所以需要单独初始化 那应该置位1？
     memory_management_struct.pages_struct->zone_struct = memory_management_struct.zones_struct;
     memory_management_struct.pages_struct->PHY_address = 0UL;
     memory_management_struct.pages_struct->attribute = 0;
@@ -282,7 +284,7 @@ void init_memory()
 
     color_printk(ORANGE, BLACK, "start_code:%#018lx,end_code:%#018lx,end_data:%#018lx,end_brk:%#018lx,end_of_struct:%#018lx\n", memory_management_struct.start_code, memory_management_struct.end_code, memory_management_struct.end_data, memory_management_struct.end_brk, memory_management_struct.end_of_struct);
 
-    // 计算分页机构本身所占的页 赋予属性 右移地板除
+    // 内核程序 分页结构等本身所占的页 赋予属性 右移地板除
     i = Virt_To_Phy(memory_management_struct.end_of_struct) >> PAGE_2M_SHIFT;
 
     for (j = 0; j <= i; j++)
