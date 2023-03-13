@@ -86,7 +86,7 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
             continue;
 
         z = memory_management_struct.zones_struct + i;
-        start = z->zone_start_address >> PAGE_2M_SHIFT; // 连续无空洞的话  起始地址对应的页index
+        start = z->zone_start_address >> PAGE_2M_SHIFT; //   起始地址对应的页index
         end = z->zone_end_address >> PAGE_2M_SHIFT;
         length = z->zone_length >> PAGE_2M_SHIFT; // 该zone总归多少页
 
@@ -108,8 +108,7 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
                 if (!(((*p >> k) | (*(p + 1) << (64 - k))) & (number == 64 ? 0xffffffffffffffffUL : ((1UL << number) - 1))))
                 {
                     unsigned long l;
-                    // page 是zone开始的index+实际开始的offset-1  页归属于一个zone所以j必定是某个zone index
-                    // 针对整个page_struct的偏移
+                    // 针对整个page_struct的偏移 应该是page = k?
                     page = j + k - 1;
                     for (l = 0; l < number; l++)
                     {
@@ -209,14 +208,15 @@ void init_memory()
     }
     color_printk(ORANGE, BLACK, "OS Can Used Total 2M PAGEs:%#010x=%010d\n", TotalMem, TotalMem);
 
-    // 理论下边界再最后一个e820的边界
+    // 理论下边界再最后一个e820的边界 (这里使用的是所有内存 不仅仅是可用的)
     TotalMem = memory_management_struct.e820[memory_management_struct.e820_length].address + memory_management_struct.e820[memory_management_struct.e820_length].length;
 
-    // 初始化位图 内核程序结束向上对齐后的位置
+    // 初始化位图 内核程序结束向上对齐后的位置(这里使用的是所有内存 不仅仅是可用的)
     memory_management_struct.bits_map = (unsigned long *)((memory_management_struct.end_brk + PAGE_4K_SIZE - 1) & PAGE_4K_MASK);
     memory_management_struct.bits_size = TotalMem >> PAGE_2M_SHIFT;
     // long 64bit 8字节。这里计算多少个2M物理页 然后按照8字节/指针大小向上对齐 计算
     memory_management_struct.bits_length = (((unsigned long)(TotalMem >> PAGE_2M_SHIFT) + sizeof(long) * 8 - 1) / 8) & (~(sizeof(long) - 1));
+    // 全部置1 相当于先占位 因为这里存储在很多不可用内存: 实际运行图 多个区域中有两个是type1 但是第一个大小小于2m 所以实际是从 0x100000 开始 然后2m向上对齐 那么实际是0x200000开始可以申请的分页
     memset(memory_management_struct.bits_map, 0xff, memory_management_struct.bits_length);
 
     // 初始化页结构指针 这里的pages_size 包括内存空洞
