@@ -271,7 +271,7 @@ void Start_Kernel(void)
 其中跳转之前 会检查特权级。如果处理程序所在代码段的特权级高于当前代码段，那么就会切换栈空间.其中切换栈空间步骤如下:
 1. 从任务状态段TSS中取出对应特权级的栈段选择子和栈指针。将他们作为中断/异常处理程序的栈空间进行切换。会把切换前的SS ESP寄存器值压入处理。
 2. 保存被中断程序的EFLAGS,CS和EIP寄存器入栈
-3. 如果产生错误码 错误码也入栈  （分别是SS ESP EFLAGS CS EIP ERRORCODE 入栈）
+3. 如果产生错误码 错误码也入栈  （分别是SS ESP(32bit) EFLAGS(32bit) CS EIP ERRORCODE(64bit) 入栈）
    
 <img src="./img/IDT_switch_stack.png">
 
@@ -345,4 +345,68 @@ void Start_Kernel(void)
 
 <img src="./img/8259_IR.png">
 
+内部结构如下图:
+
+<img src="./img/8259_inner.png">
+
+
+
+主要通过ICW(initialization command word 初始化命令字 用于初始化中断控制器。)寄存器组和OCW（operational control word 操作控制字 操作控制器）寄存器组控制。主芯片映射到20h(ICW1,OCW2-3) 和 21h（ICW 2-4 ,OCW1）端口  从芯片映射到A0h(ICW1,OCW2-3) 和 A1h(ICW2-4,OCW1).
+
+- IRR  (interrupt request register)中断请求控制器.保存IR0~IR7引脚上接受的中断请求。8bit
+- IMR  (interrupt mask register) 中断屏蔽寄存器 纪录屏蔽的外部引脚 同样8bit
+- PR (priority resolver)优先级解析器 从IRR中接受的中断请求中选取最高优先级 发到ISR
+- ISR (In-service register) 正在服务寄存器。 纪录正在处理的中断请求。 8259芯片会向cpu发送一个INT信号。CPU在执行完一条指令后检测时候收到中断信号。收到则停止执行接下去的指令 转而向8259发送一个INT A 了应答中断请求。8259收到后便会把该中断请求保存到ISR中，并置位相应寄存器位。
+
+随后cpu会向8259A芯片发送第二个INT A信号。通知其发送中断信号量。芯片将信号量发送到数据总线上供cpu读取，cpu就可以根据中断向量到IDT中检索对应的门描述符并执行处理程序。
+
+如果芯片采取AEOI(automatic end of interrupt) 那么芯片会在第二个INTA信号的结尾处复位正在服务寄存器ISR的对应位。如果不是那么cpu必须在中断处理程序的结尾处向8259芯片发送EOI命令来复位ISR寄存器对应位。如果请求来自次芯片 那么必须向两个芯片都发送EOI.此后8259芯片将继续判断下一个最高优先级的中断，并重复上面的步骤。
+
+ICW初始化必须严格按照ICW1-4的顺序 ，因此可以先主芯片的ICW1-4 在次芯片的ICW1-4,或者主1从1 主2从2...的顺序。
+
+ICW4个寄存器都是8bit的. ICW1 对应主芯片的20h端口和从芯片的A0h端口.ICW2-4对应主芯片的21h端口和从芯片的A1h端口。
+各自的作用如下图:
+
+<img src="./img/ICW1.png"/><br>ICW1一般默认初始化位`00010001B(11h)`<br><br>
+<img src="./img/ICW2.png"/><br>ICW2 一般主芯片中断向量号设置位20h(占用向量号20h-27h) 此芯片28h(28h-2fh)
+
+
+ICW3寄存器分主次 各位代表的含义不同:
+
+主芯片ICW3如下:
+
+<img src="./img/ICW3-1.png"/><br>代表引脚和级联从芯片的连接状态.也就是哪个引脚和次级芯片连接
+
+
+<img src="./img/ICW3-2.png"><br>
+次芯片的ICW3前3bit表示自己和主芯片的哪个引脚连接。比如从和主的IR2 引脚连接 那么主ICW3 就是00000100B(04h)从芯片则是00000010B（02h）
+
+
+<img src="./img/ICW4.png"><br>
+
+一般将主从ICW4设置位01h即可 也就是FNM 模式 无缓冲 EOI模式以及我们这边的8086/88模式。
+
+
+OCW三个寄存器(都是8bit)。三个寄存器没有操作顺序之分。
+
+OCW1映射到主芯片的21h端口，从芯片的A1端口
+OCW2-3映射到主芯片的20h端口 从芯片的A0端口
+
+他们的作用如下:
+
+
+<img src="./img/OCW1.png"><br>
+这个简单 就是屏蔽对应引脚的中断请求。1代表屏蔽
+
+
+<img src="./img/OCW2.png"><br>
+
+其中部分常用组合如下：
+
+<img src="./img/OCW2-1.png"><br>
+前三位设置的优先级是配合特殊循环使用。
+
+<img src="./img/OCW3.png"><br>
+
+OCW3。有个特殊屏蔽模式 配合OCW1的操作来设置IMR 并且复位对应的ISR这样来打断中断处理程序。
 

@@ -60,7 +60,7 @@ ENTRY(ret_from_intr)
 ENTRY(divide_error)
 	pushq	$0                           // 压入0 占位ERRCODE 因为#DE没有ERRCODE
 	pushq	%rax
-	leaq	do_divide_error(%rip),	%rax
+	leaq	do_divide_error(%rip),	%rax   // leaq lead effective address 这里就是将do_divide_error的字面值也就是地址给rax寄存器
 	xchgq	%rax,	(%rsp)               // 交换rax 和rsp内存处的值   就是push do_divide_error到栈中
 
 // 各自errcode 和异常处理程序地址保存后的通用步骤
