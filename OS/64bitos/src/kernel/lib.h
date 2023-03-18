@@ -2,6 +2,13 @@
 #define __LIB_H__
 
 #define NULL 0
+#define sti() __asm__ __volatile__("sti	\n\t" :: \
+									   : "memory")
+#define cli() __asm__ __volatile__("cli	\n\t" :: \
+									   : "memory")
+#define nop() __asm__ __volatile__("nop	\n\t")
+#define io_mfence() __asm__ __volatile__("mfence	\n\t" :: \
+											 : "memory")
 /*
 	计算字符串长度
 	cld df=0 控制内存地址向高位递增
@@ -60,4 +67,35 @@ static inline void *memset(void *Address, unsigned char C, long Count)
 						 : "memory");
 	return Address;
 }
+
+/*
+	8bit端口输入 inb 读取一个byte
+	mfence 读写都串行化 在mfence指令前的读写操作当必须在mfence指令后的读写操作前完成
+	同理还有sfence 和lfence 理解成save/load 保证写操作和读操作 指令前的写/读操作必须在指令之后的操作前完成
+*/
+
+static inline unsigned char io_in8(unsigned short port)
+{
+	unsigned char ret = 0;
+	__asm__ __volatile__("inb	%%dx,	%0	\n\t"
+						 "mfence			\n\t"
+						 : "=a"(ret)
+						 : "d"(port)
+						 : "memory");
+	return ret;
+}
+
+/*
+	8bit端口输出
+*/
+
+static inline void io_out8(unsigned short port, unsigned char value)
+{
+	__asm__ __volatile__("outb	%0,	%%dx	\n\t"
+						 "mfence			\n\t"
+						 :
+						 : "a"(value), "d"(port)
+						 : "memory");
+}
+
 #endif

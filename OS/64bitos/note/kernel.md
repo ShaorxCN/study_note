@@ -362,7 +362,7 @@ void Start_Kernel(void)
 
 如果芯片采取AEOI(automatic end of interrupt) 那么芯片会在第二个INTA信号的结尾处复位正在服务寄存器ISR的对应位。如果不是那么cpu必须在中断处理程序的结尾处向8259芯片发送EOI命令来复位ISR寄存器对应位。如果请求来自次芯片 那么必须向两个芯片都发送EOI.此后8259芯片将继续判断下一个最高优先级的中断，并重复上面的步骤。
 
-ICW初始化必须严格按照ICW1-4的顺序 ，因此可以先主芯片的ICW1-4 在次芯片的ICW1-4,或者主1从1 主2从2...的顺序。
+ICW初始化必须严格按照ICW1-4的顺序 ，因此可以先主芯片的ICW1-4 在次芯片的ICW1-4,或者主1从1 主2从2...的顺序（这里bit位用上 所以在2-3占用同一个端口的时候必须按照次序初始化）。
 
 ICW4个寄存器都是8bit的. ICW1 对应主芯片的20h端口和从芯片的A0h端口.ICW2-4对应主芯片的21h端口和从芯片的A1h端口。
 各自的作用如下图:
@@ -390,7 +390,7 @@ ICW3寄存器分主次 各位代表的含义不同:
 OCW三个寄存器(都是8bit)。三个寄存器没有操作顺序之分。
 
 OCW1映射到主芯片的21h端口，从芯片的A1端口
-OCW2-3映射到主芯片的20h端口 从芯片的A0端口
+OCW2-3映射到主芯片的20h端口 从芯片的A0端口(如果bit3是0则是则是发到OCW2 1则是发到OCW3)
 
 他们的作用如下:
 
@@ -404,9 +404,46 @@ OCW2-3映射到主芯片的20h端口 从芯片的A0端口
 其中部分常用组合如下：
 
 <img src="./img/OCW2-1.png"><br>
-前三位设置的优先级是配合特殊循环使用。
+前三位设置的优先级是配合特殊循环使用。比如手动发送EOI 则是bit5位1 其他0 就是00100000b 也就是0x20
 
 <img src="./img/OCW3.png"><br>
 
 OCW3。有个特殊屏蔽模式 配合OCW1的操作来设置IMR 并且复位对应的ISR这样来打断中断处理程序。
 
+这里说明下 具体见[osdev_ivt](https://wiki.osdev.org/Interrupt_Vector_Table)
+
+ x86架构下 0x00-0x13(00-19)固定异常异常  0x14-0x1F(20-31)保留 0x20-0xff(32-255)用户自定义 所以下面init_interrupt从32开始.
+
+ <img src="./img/x86ivt.png">
+<br>
+
+ 下面是主从8259定义的IRQ：
+```
+Master 8259:
+
+Some interrupts mapped by the 8259 by default overlap with some of the processor's exception handlers. These can be remapped via the 8259's IO ports.
+
+ IVT Offset | INT # | IRQ # | Description
+-----------+-------+-------+------------------------------
+0x0020     | 0x08  | 0     | PIT
+0x0024     | 0x09  | 1     | Keyboard
+0x0028     | 0x0A  | 2     | 8259A slave controller
+0x002C     | 0x0B  | 3     | COM2 / COM4
+0x0030     | 0x0C  | 4     | COM1 / COM3
+0x0034     | 0x0D  | 5     | LPT2
+0x0038     | 0x0E  | 6     | Floppy controller
+0x003C     | 0x0F  | 7     | LPT1
+
+Slave 8259:
+
+IVT Offset | INT # | IRQ # | Description
+-----------+-------+-------+------------------------------
+0x01C0     | 0x70  | 8     | RTC
+0x01C4     | 0x71  | 9     | Unassigned
+0x01C8     | 0x72  | 10    | Unassigned
+0x01CC     | 0x73  | 11    | Unassigned
+0x01D0     | 0x74  | 12    | Mouse controller
+0x01D4     | 0x75  | 13    | Math coprocessor
+0x01D8     | 0x76  | 14    | Hard disk controller 1
+0x01DC     | 0x77  | 15    | Hard disk controller 2
+```

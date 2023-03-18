@@ -36,14 +36,23 @@
     "movq	%rdx,	%ds;	\n\t"   \
     "movq	%rdx,	%es;	\n\t"
 
-#define IRQ_NAME2(nr) nr##_interrupt(void)
-#define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
 
 /*
     上面## 用于连接两个宏值。宏展开的时候它会将操作符两边的内容连接起来。 #则是吧后面的内容当作字符串
     比如Build_IRQ(0x20) 展开=> void IRQ_NAME(0x20)=>void IRQ_NAME2(IRQ##0x20）=> void IRQ0x20_interrupt(void)
     其中宏展开 先展开发现替换文本中形参是带有#或者## 则不展开实参宏 否则先展开宏参数再展开当前宏
     宏定义不是语句 不用带分号 如果带分号则分号也是替换文本 比如这里就代表是两条语句
+*/
+#define IRQ_NAME2(nr) nr##_interrupt(void)
+#define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
+
+/*
+    统一生成中断处理通用逻辑--程序入口
+    这里同理 首先执行IRQ_NAME(nr) 也就是生成函数签名 例如nr是0x20
+    然后是生成lable IRQ0x20_intterrupt
+    同理movq $那行 是 moveq $0x20,%rsi来传参
+
+    ret_from_intr需要保存中断程序返回的地址 因为jmp 不会压栈 而ret需要
 */
 
 #define Build_IRQ(nr)                                                          \
@@ -85,6 +94,8 @@ Build_IRQ(0x35)
 Build_IRQ(0x36)
 Build_IRQ(0x37)
 
+
+// 这里说明下  x86架构下 0x00-0x13(00-19)固定异常异常  0x14-0x1F(20-31)保留 0x20-0xff(32-255)用户自定义 所以下面init_interrupt从32开始
 void (*interrupt[24])(void) =
     {
         IRQ0x20_interrupt,
@@ -113,6 +124,8 @@ void (*interrupt[24])(void) =
         IRQ0x37_interrupt,
 };
 
+
+// 默认硬件
 void init_interrupt()
 {
     int i;
@@ -122,8 +135,31 @@ void init_interrupt()
     }
 
     color_printk(RED, BLACK, "8259A init \n");
+
+    //8259A-master	ICW1-4
+	io_out8(0x20,0x11);
+	io_out8(0x21,0x20);
+	io_out8(0x21,0x04);
+	io_out8(0x21,0x01);
+
+	//8259A-slave	ICW1-4
+	io_out8(0xa0,0x11);
+	io_out8(0xa1,0x28);
+	io_out8(0xa1,0x02);
+	io_out8(0xa1,0x01);
+
+	//8259A-M/S	OCW1
+	io_out8(0x21,0x00);
+	io_out8(0xa1,0x00);
+
+	sti();
 }
 
 /*
-
+    通过rdi rsi寄存器传送参数  rsp和中断号
 */
+void do_IRQ(unsigned long regs,unsigned long nr)	//regs:rsp,nr
+{
+	color_printk(RED,BLACK,"do_IRQ:%#08x\t",nr);
+	io_out8(0x20,0x20);   // 发送EOI
+}

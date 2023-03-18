@@ -3,6 +3,7 @@
 #include "trap.h"
 #include "printk.h"
 #include "memory.h"
+#include "interrupt.h"
 
 // 段标识符 代码段开始 代码段结束 数据段结束 程序结束 在Kernel.lds中有指明
 extern char _text;
@@ -101,6 +102,8 @@ void Start_Kernel(void)
 
 	color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *memory_management_struct.bits_map);
 	color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *(memory_management_struct.bits_map + 1));
+	color_printk(RED, BLACK, "interrupt init \n");
+	init_interrupt();
 
 	while (1)
 		;
