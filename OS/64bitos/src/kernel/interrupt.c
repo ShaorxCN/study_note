@@ -47,9 +47,9 @@
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
 
 /*
-    统一生成中断处理通用逻辑--程序入口
-    这里同理 首先执行IRQ_NAME(nr) 也就是生成函数签名 例如nr是0x20
-    然后是生成lable IRQ0x20_intterrupt
+    统一生成中断处理通用逻辑
+    这里同理 首先执行IRQ_NAME(nr) 也就是声明函数 例如nr是0x20  void IRQ0x20_interrupt(void)
+    然后是执行汇编代码生成lable 可以视为函数入口：IRQ0x20_intterrupt
     同理movq $那行 是 moveq $0x20,%rsi来传参
 
     ret_from_intr需要保存中断程序返回的地址 因为jmp 不会压栈 而ret需要
@@ -149,17 +149,21 @@ void init_interrupt()
 	io_out8(0xa1,0x01);
 
 	//8259A-M/S	OCW1
-	io_out8(0x21,0x00);
-	io_out8(0xa1,0x00);
+	io_out8(0x21,0xfd);  // 屏蔽除了IRQ1 也就是键盘之外的中断请求
+	io_out8(0xa1,0xff);
 
 	sti();
 }
 
 /*
     通过rdi rsi寄存器传送参数  rsp和中断号
+    统一入口
 */
 void do_IRQ(unsigned long regs,unsigned long nr)	//regs:rsp,nr
 {
+    unsigned char x;
 	color_printk(RED,BLACK,"do_IRQ:%#08x\t",nr);
-	io_out8(0x20,0x20);   // 发送EOI
+	x = io_in8(0x60);  // 键盘芯片的读写缓冲区 这里读取其中的按键扫描码
+	color_printk(RED,BLACK,"key code:%#08x\n",x);
+	io_out8(0x20,0x20);  // 发送EOI
 }
