@@ -10,6 +10,8 @@
 - [3.内存管理](#c3)
     - [3.1 初级内存管理](#c3-1)
     - [3.2 中断处理](#c3-2)
+- [4.进程管理](#c4)
+	- [4.1 简介](#c4-1)
 
 
 
@@ -447,3 +449,11 @@ IVT Offset | INT # | IRQ # | Description
 0x01D8     | 0x76  | 14    | Hard disk controller 1
 0x01DC     | 0x77  | 15    | Hard disk controller 2
 ```
+
+
+
+<div id=c4><h2>进程管理</h2></div>
+<div id=c4-1><h3>简介</h3></div>
+
+- PCB process control block
+  

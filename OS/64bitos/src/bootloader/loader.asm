@@ -26,7 +26,7 @@ GdtPtr	dw	GdtLen - 1             ;GDT界限   低位 表示长度
 
 ; 段描述符再GDT中的段选择子
 SelectorCode32	equ	LABEL_DESC_CODE32 - LABEL_GDT   ;8 =  0000 0000 0001 0000 RPL(bit[0,1] 特权级别 这里是0 TI(bit[2] 0表示GDT) index(bit[3-15] 这里是1))
-SelectorData32	equ	LABEL_DESC_DATA32 - LABEL_GDT   ;16
+SelectorData32	equ	LABEL_DESC_DATA32 - LABEL_GDT   ;16  0x10
 
 [SECTION gdt64]
 
