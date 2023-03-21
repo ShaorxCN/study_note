@@ -61,6 +61,7 @@ struct thread_struct
 // 内核线程(核心进程)
 #define PF_KTHREAD (1 << 0)
 
+// 和内核层栈一体 低位放task_struct 高地址则作为内核层栈空间使用
 struct task_struct
 {
     struct List list;    // 双向链表 连接各进程pcb
@@ -84,8 +85,8 @@ struct task_struct
 union task_union
 {
     struct task_struct task;
-    unsigned long stack[STACK_SIZE / sizeof(unsigned long)]; // 该进程使用的栈空间
-} __attribute__((aligned(8)));                               // 实际整体是按照32k对齐 见lds文件
+    unsigned long stack[STACK_SIZE / sizeof(unsigned long)]; // 该进程使用的内核栈  也就是linux进程内核栈 暂定32k 不够再扩展
+} __attribute__((aligned(8)));                               // 实际整体是按照32k对齐 见lds文件 也就是结构体放在低地址 然后上方是栈空间使用
 
 struct mm_struct init_mm;
 struct thread_struct init_thread;
@@ -107,7 +108,7 @@ struct thread_struct init_thread;
 // 表示将init_task_union 放到 .data.init_task的section 里  将task_struct 初始化
 union task_union init_task_union __attribute__((__section__(".data.init_task"))) = {INIT_TASK(init_task_union.task)};
 
-//  这是位多核准备的 每个核心对应一个初始化进程控制结构体。现在只有index0 实例化了
+//  这是为多核准备的 每个核心对应一个初始化进程控制结构体。现在只有index0 实例化了
 struct task_struct *init_task[NR_CPUS] = {&init_task_union.task, 0};
 
 struct mm_struct init_mm = {0};
@@ -164,4 +165,20 @@ struct tss_struct
 
 // 0 ... m 表示0到m 双闭区间 一定要有空格间隔
 struct tss_struct init_tss[NR_CPUS] = {[0 ... NR_CPUS - 1] = INIT_TSS};
+
+// 获取当前ts  32k-1 取反 然后and就是向下对齐 因为是栈指针rsp 那就是其实相当于取低位的ts
+inline struct task_struct *get_current()
+{
+    struct task_struct *current = NULL;
+    __asm__ __volatile__("andq %%rsp,%0	\n\t"
+                         : "=r"(current)
+                         : "0"(~32767UL));
+    return current;
+}
+
+#define current get_current()
+
+#define GET_CURRENT        \
+    "movq	%rsp,	%rbx	\n\t" \
+    "andq	$-32768,%rbx	\n\t"
 #endif

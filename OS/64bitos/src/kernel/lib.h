@@ -9,6 +9,71 @@
 #define nop() __asm__ __volatile__("nop	\n\t")
 #define io_mfence() __asm__ __volatile__("mfence	\n\t" :: \
 											 : "memory")
+
+// 双向链表
+struct List
+{
+	struct List *prev;
+	struct List *next;
+};
+
+// 初始化 这里初始化是都指向自己
+inline void list_init(struct List *list)
+{
+	list->prev = list;
+	list->next = list;
+}
+
+// node加到entry后面
+inline void list_add_to_behind(struct List *entry, struct List *node) ////add to entry behind
+{
+	add->next = entry->next;
+	add->prev = entry;
+	add->next->prev = add;
+	entry->next = add;
+}
+
+// add加到entry前面
+inline void list_add_to_before(struct List *entry, struct List *add) ////add to entry behind
+{
+	add->next = entry;
+	entry->prev->next = add;
+	add->prev = entry->prev;
+	entry->prev = add;
+}
+
+// 删除entry
+inline void list_del(struct List *entry)
+{
+	entry->next->prev = entry->prev;
+	entry->prev->next = entry->next;
+}
+
+// 判断吧list是否为空
+inline long list_is_empty(struct List *entry)
+{
+	if (entry == entry->next && entry->prev == entry)
+		return 1;
+	else
+		return 0;
+}
+
+inline struct List *list_prev(struct List *entry)
+{
+	if (entry->prev != NULL)
+		return entry->prev;
+	else
+		return NULL;
+}
+
+inline struct List *list_next(struct List *entry)
+{
+	if (entry->next != NULL)
+		return entry->next;
+	else
+		return NULL;
+}
+
 /*
 	计算字符串长度
 	cld df=0 控制内存地址向高位递增
