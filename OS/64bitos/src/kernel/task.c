@@ -1,7 +1,10 @@
 #include "task.h"
-#include "gate.h"
+#include "ptrace.h"
 #include "lib.h"
 #include "memory.h"
+#include "printk.h"
+#include "linkage.h"
+#include "gate.h"
 
 // init进程创建函数
 unsigned long init(unsigned long arg)
@@ -116,7 +119,7 @@ int kernel_thread(unsigned long (*fn)(unsigned long), unsigned long arg, unsigne
     return do_fork(&regs, flags, 0, 0);
 }
 
-inline void __switch_to(struct task_struct *prev, struct task_struct *next)
+void __switch_to(struct task_struct *prev, struct task_struct *next)
 {
     // 保存0环栈指针
     init_tss[0].rsp0 = next->thread->rsp0;

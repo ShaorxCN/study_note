@@ -9,7 +9,7 @@ all: system
 # 链接 -b 指定obj文件格式
 # -T 指定连接脚本文件
 system:	head.o entry.o main.o printk.o trap.o memory.o interrupt.o task.o
-	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o task.o main.o printk.o trap.o interrupt.o  -T Kernel.lds 
+	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o  main.o printk.o trap.o interrupt.o task.o -T Kernel.lds 
 
 head.o:	head.S
 # -E表示仅预处理 不执行编译汇编或者链接 预处理 编译生成汇编代码一类  汇编生成obj
