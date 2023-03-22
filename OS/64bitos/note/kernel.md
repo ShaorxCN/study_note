@@ -462,5 +462,19 @@ IVT Offset | INT # | IRQ # | Description
 
 <img src="./img/process_switch.png"><br>
 
+下面是64位tss结构图:
+
+<img src="./img/tss64.png"><br>
+
+这是进程linux内存布局 这里是实际内存空间  32bit 4g 高1g给作为内核空间
+
+<img src="./img/p_linux.png"></br>
+
+这边进程切换首先保存寄存器值（自己的栈） 然后通过内核栈实现rsp和ip的切换。然后通过tss保存fs等寄存器和内核栈指针实现fs gs的加载
+
+这里有一个博客整理的 ldle切换到init的代码流程图:
+
+<img src="./img/ldle_init.png"><br>
+
 
   

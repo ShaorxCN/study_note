@@ -4,10 +4,19 @@
 #include "lib.h"
 #include "memory.h"
 #include "cpu.h"
+#include "ptrace.h"
 
 // 模式进入kernel后手动跟新了cs
 #define KERNEL_CS (0x08)
 #define KERNEL_DS (0x10)
+
+#define USER_CS (0x28)
+#define USER_DS (0x30)
+
+#define CLONE_FS (1 << 0)
+#define CLONE_FILES (1 << 1)
+#define CLONE_SIGNAL (1 << 2)
+
 // stack size 32K
 #define STACK_SIZE 32768
 
@@ -21,6 +30,7 @@ extern char _bss;
 extern char _ebss;
 extern char _end;
 
+// 就是第一个进程（ldle）的内核栈顶
 extern unsigned long _stack_start;
 
 extern void ret_from_intr();
@@ -33,7 +43,7 @@ extern void ret_from_intr();
 #define TASK_ZOMBIE (1 << 3)
 #define TASK_STOPPED (1 << 4)
 
-// 内存描述结构
+// 内存描述结构 用户空间的
 struct mm_struct
 {
     pml4t_t *pgd; // 页表指针 cr3
@@ -42,12 +52,12 @@ struct mm_struct
     unsigned long start_rodata, end_rodata;
     unsigned long start_brk, end_brk; // 动态内存分配区
     unsigned long start_stack;        // 应用层栈基地址
-}
+};
 
 // 进程切换时保存现场用结构
 struct thread_struct
 {
-    unsigned long rsp0; // in tss 在内核层中使用的栈基地址
+    unsigned long rsp0; // in tss 在内核层中使用的栈指针 内核栈指针
     unsigned long rip;  // 切换回来的代码指针
     unsigned long rsp;  // 进程切换时的栈指针
     unsigned long fs;
@@ -56,12 +66,12 @@ struct thread_struct
     unsigned long cr2;
     unsigned long trap_nr; // 异常产生时候的异常号
     unsigned long error_code;
-}
+};
 
 // 内核线程(核心进程)
 #define PF_KTHREAD (1 << 0)
 
-// 和内核层栈一体 低位放task_struct 高地址则作为内核层栈空间使用
+// pcb
 struct task_struct
 {
     struct List list;    // 双向链表 连接各进程pcb
@@ -69,10 +79,10 @@ struct task_struct
     unsigned long flags; // 任务标志:进程 线程 内核线程
 
     struct mm_struct *mm;         // 内存空间结构体 包含页表和程序段信息
-    struct thread_struct *thread; // 进程切换时保留的状态信息
+    struct thread_struct *thread; // 进程切换时保留的状态信息 比如rsp0 ip等
     /*
     0x0000,0000,0000,0000 - 0x0000,7fff,ffff,ffff user
-    0xffff,8000,0000,0000 - 0xffff,ffff,ffff,ffff kernel
+    0xffff,8000,0000,0000 - 0xffff,ffff,ffff,ffff kernel 高位作为内核
     e */
     unsigned long addr_limit; // 进程空间地址范围
 
@@ -80,8 +90,9 @@ struct task_struct
     long counter;  // 进程可用时间片
     long signal;   // 进程持有的信号
     long priority; // 进程优先级
-}
+};
 
+// 内核为每个进程创建的管理  和内核栈一体 低位放task_struct 高地址则作为内核层栈空间使用
 union task_union
 {
     struct task_struct task;
@@ -89,9 +100,11 @@ union task_union
 } __attribute__((aligned(8)));                               // 实际整体是按照32k对齐 见lds文件 也就是结构体放在低地址 然后上方是栈空间使用
 
 struct mm_struct init_mm;
+
+// 定义第一个进程
 struct thread_struct init_thread;
 
-// 定义第一个进程初始化
+// 定义第一个进程初始化 实际应该是ldle?
 #define INIT_TASK(tsk)                    \
     {                                     \
         .state = TASK_UNINTERRUPTIBLE,    \
@@ -105,12 +118,14 @@ struct thread_struct init_thread;
         .priority = 0                     \
     }
 
-// 表示将init_task_union 放到 .data.init_task的section 里  将task_struct 初始化
+// 声明并初始化init_task_union
+// 表示将init_task_union 放到 .data.init_task的section 里  将task_struct 初始化 手动创建第一个进程的结构
 union task_union init_task_union __attribute__((__section__(".data.init_task"))) = {INIT_TASK(init_task_union.task)};
 
 //  这是为多核准备的 每个核心对应一个初始化进程控制结构体。现在只有index0 实例化了
 struct task_struct *init_task[NR_CPUS] = {&init_task_union.task, 0};
 
+// 内存纪录结构
 struct mm_struct init_mm = {0};
 
 struct thread_struct init_thread =
@@ -144,6 +159,7 @@ struct tss_struct
     unsigned short iomapbaseaddr;
 } __attribute__((packed));
 
+// 定义第一个进程的tss
 #define INIT_TSS                                                                             \
     {                                                                                        \
         .reserved0 = 0,                                                                      \
@@ -163,11 +179,11 @@ struct tss_struct
         .iomapbaseaddr = 0                                                                   \
     }
 
-// 0 ... m 表示0到m 双闭区间 一定要有空格间隔
+// 0 ... m 表示0到m 双闭区间 一定要有空格间隔 每个cpu一个
 struct tss_struct init_tss[NR_CPUS] = {[0 ... NR_CPUS - 1] = INIT_TSS};
 
 // 获取当前ts  32k-1 取反 然后and就是向下对齐 因为是栈指针rsp 那就是其实相当于取低位的ts
-inline struct task_struct *get_current()
+static inline struct task_struct *get_current()
 {
     struct task_struct *current = NULL;
     __asm__ __volatile__("andq %%rsp,%0	\n\t"
@@ -181,4 +197,28 @@ inline struct task_struct *get_current()
 #define GET_CURRENT        \
     "movq	%rsp,	%rbx	\n\t" \
     "andq	$-32768,%rbx	\n\t"
+
+// 进程切换函数  首先保存prev的rsp和rip 然后将next的rsp值存放到rsp寄存器中 此时将next 的rip压栈 这时候通过ret指令弹栈进入next模块
+// 参数传递 rdi rsi
+#define switch_to(prev, next)                                                                       \
+    do                                                                                              \
+    {                                                                                               \
+        __asm__ __volatile__("pushq	%%rbp	\n\t"                                                     \
+                             "pushq	%%rax	\n\t"                                                     \
+                             "movq	%%rsp,	%0	\n\t"                                                  \
+                             "movq	%2,	%%rsp	\n\t"                                                  \
+                             "leaq	1f(%%rip),	%%rax	\n\t"                                           \
+                             "movq	%%rax,	%1	\n\t"                                                  \
+                             "pushq	%3		\n\t"                                                       \
+                             "jmp	__switch_to	\n\t"                                                 \
+                             "1:	\n\t"                                                              \
+                             "popq	%%rax	\n\t"                                                      \
+                             "popq	%%rbp	\n\t"                                                      \
+                             : "=m"(prev->thread->rsp), "=m"(prev->thread->rip)                     \
+                             : "m"(next->thread->rsp), "m"(next->thread->rip), "D"(prev), "S"(next) \
+                             : "memory");                                                           \
+    } while (0)
+
+unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned long stack_start, unsigned long stack_size);
+void task_init();
 #endif

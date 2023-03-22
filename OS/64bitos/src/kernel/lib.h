@@ -2,6 +2,19 @@
 #define __LIB_H__
 
 #define NULL 0
+
+// 根据结构体内的某个成员变量的基地址 得出结构体变量的基地址
+// ptr 某个成员变量的地址  type 成员变量所在的结构体  member 成员变量名称
+/*
+	(type *)0)->member 基于0地址获取member的偏移 也就是成员再结构体内的偏移
+	然后再用ptr减去这个偏移就是结构体变量的基地址
+*/
+#define container_of(ptr, type, member)                                     \
+	({                                                                      \
+		typeof(((type *)0)->member) *p = (ptr);                             \
+		(type *)((unsigned long)p - (unsigned long)&(((type *)0)->member)); \
+	})
+
 #define sti() __asm__ __volatile__("sti	\n\t" :: \
 									   : "memory")
 #define cli() __asm__ __volatile__("cli	\n\t" :: \
@@ -17,15 +30,15 @@ struct List
 	struct List *next;
 };
 
-// 初始化 这里初始化是都指向自己
-inline void list_init(struct List *list)
+// 初始化 这里初始化是都先指向自己
+static inline void list_init(struct List *list)
 {
 	list->prev = list;
 	list->next = list;
 }
 
 // node加到entry后面
-inline void list_add_to_behind(struct List *entry, struct List *node) ////add to entry behind
+static inline void list_add_to_behind(struct List *entry, struct List *add) ////add to entry behind
 {
 	add->next = entry->next;
 	add->prev = entry;
@@ -34,7 +47,7 @@ inline void list_add_to_behind(struct List *entry, struct List *node) ////add to
 }
 
 // add加到entry前面
-inline void list_add_to_before(struct List *entry, struct List *add) ////add to entry behind
+static inline void list_add_to_before(struct List *entry, struct List *add) ////add to entry behind
 {
 	add->next = entry;
 	entry->prev->next = add;
@@ -43,14 +56,14 @@ inline void list_add_to_before(struct List *entry, struct List *add) ////add to 
 }
 
 // 删除entry
-inline void list_del(struct List *entry)
+static inline void list_del(struct List *entry)
 {
 	entry->next->prev = entry->prev;
 	entry->prev->next = entry->next;
 }
 
 // 判断吧list是否为空
-inline long list_is_empty(struct List *entry)
+static inline long list_is_empty(struct List *entry)
 {
 	if (entry == entry->next && entry->prev == entry)
 		return 1;
@@ -58,7 +71,7 @@ inline long list_is_empty(struct List *entry)
 		return 0;
 }
 
-inline struct List *list_prev(struct List *entry)
+static inline struct List *list_prev(struct List *entry)
 {
 	if (entry->prev != NULL)
 		return entry->prev;
@@ -66,12 +79,38 @@ inline struct List *list_prev(struct List *entry)
 		return NULL;
 }
 
-inline struct List *list_next(struct List *entry)
+static inline struct List *list_next(struct List *entry)
 {
 	if (entry->next != NULL)
 		return entry->next;
 	else
 		return NULL;
+}
+
+/*
+		From => To memory copy Num bytes
+*/
+
+static inline void *memcpy(void *From, void *To, long Num)
+{
+	int d0, d1, d2;
+	__asm__ __volatile__("cld	\n\t"
+						 "rep	\n\t"
+						 "movsq	\n\t"
+						 "testb	$4,%b4	\n\t"
+						 "je	1f	\n\t"
+						 "movsl	\n\t"
+						 "1:\ttestb	$2,%b4	\n\t"
+						 "je	2f	\n\t"
+						 "movsw	\n\t"
+						 "2:\ttestb	$1,%b4	\n\t"
+						 "je	3f	\n\t"
+						 "movsb	\n\t"
+						 "3:	\n\t"
+						 : "=&c"(d0), "=&D"(d1), "=&S"(d2)
+						 : "0"(Num / 8), "q"(Num), "1"(To), "2"(From)
+						 : "memory");
+	return To;
 }
 
 /*

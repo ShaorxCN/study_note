@@ -1,9 +1,11 @@
+#include "linkage.h"
+
 .section .text
 // 在GAS编译器中，使用标识符_start作为程序的默认起始位置，同时还要使用伪指令.globl对_start标识符加以修饰。
 //如果不使用.globl修饰_start标识符的话，链接过程会出现警告ld: warning: cannot find entry symbol _start; defaulting to ffff800000100000。
 .globl _start
 
-_start:
+ENTRY(_start)
 
 	mov	$0x10,	%ax
 	mov	%ax,	%ds
@@ -193,6 +195,10 @@ Loop:
 
 int_msg:
 	.asciz "Unknown interrupt or fault at RIP\n"
+
+ENTRY(_stack_start)
+	.quad	init_task_union + 32768
+
 //=======	init page  初始化页表
 .align 8                               // 8字节对齐
 // 确定该结构存放在段的相对偏移0x1000处（相对上面的.text）  .org new-lc , fill 如果作用填充当前位置到新位置 不能跨段

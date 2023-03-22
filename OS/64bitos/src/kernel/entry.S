@@ -49,7 +49,10 @@ RESTORE_ALL:
 	popq	%rax;		
 	addq	$0x10,	%rsp;	       // 增加16B  为了弹出栈中的变量FUNC 和ERRCODE 这里保存着实际是中断处理程序的地址 所以要先弹出 方便iretq还原现场
 	iretq;
-
+	
+#define GET_CURRENT(reg)	\
+	movq	$-32768,reg;	\
+	andq	%rsp,	reg
 
 ret_from_exception:
 	/*GET_CURRENT(%ebx)	need rewrite*/

@@ -4,6 +4,7 @@
 #include "printk.h"
 #include "memory.h"
 #include "interrupt.h"
+#include "task.h"
 
 // 段标识符 代码段开始 代码段结束 数据段结束 程序结束 在Kernel.lds中有指明
 extern char _text;
@@ -105,6 +106,8 @@ void Start_Kernel(void)
 	color_printk(RED, BLACK, "interrupt init \n");
 	init_interrupt();
 
+	color_printk(RED, BLACK, "task_init \n");
+	task_init();
 	while (1)
 		;
 }

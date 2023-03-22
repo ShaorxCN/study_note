@@ -1,7 +1,7 @@
 #ifndef __PTRACE_H__
 #define __PTRACE_H__
 
-// 通用保存现场结构体
+// 程序执行现场(环境)结构体
 struct pt_regs
 {
     unsigned long r15;
