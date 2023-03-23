@@ -133,9 +133,8 @@ subsection name 就是子段  属于段下面的
 比如我们通常说的，代码段、数据段是segment，目标代码中的section会被链接器组织到可执行文件的各个segment中。
 .text section的内容会组装到代码段中，.data, .bss等节的内容会包含在数据段中。
 
-<div id ="link"><h2>链接</h2</div>
+<div id ="link"><h2>链接</h2></div>
 
-lds 链接脚本
 
 ```lds
 SECTIONS
@@ -152,6 +151,15 @@ SECTIONS
 
 `*` 是通配符 代表所有目标文件的代码段都放到可执行文件输出段的代码段.text中。
 
+ENTRY(SYMBOL)：将符号 SYMBOL 的值设置为入口地址，入口地址是进程执行的第一条指令在进程地址空间的地址（比如 ENTRY(Reset_Handler) 表示进程最开始从复位中断服务函数处执行）
+
+ 有多种方法设置进程入口地址，以下编号越小，优先级越高
+
+1. ld 命令行的 -e 选项
+2. 链接脚本的 ENTRY(SYMBOL) 命令
+3. 在汇编程序中定义了 start 符号，使用 start 符号值
+4. 如果存在 .text section，使用 .text section 首地址的值
+5. 使用地址 0 的值
 
 在x64模式下，大部分编译器采用寄存器传递参数，参数按照从左向右的顺序依次是RDI、RSI、RDX、RCX、R8、R9，剩余参数使用内存传递方式，RAX放置函数的返回值，调用者负责平衡栈。
 

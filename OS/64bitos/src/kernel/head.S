@@ -35,7 +35,8 @@ ENTRY(_start)
 
 	movq	$0x101000,	%rax
 	movq	%rax,		%cr3
-	movq	switch_seg(%rip),	%rax
+	// 这里movq代表从switch_seg的位置读取8B到rax
+	movq	switch_seg(%rip),	%rax  // 通过这种方式从loader的 0x100000到0xffff800000100000的切换 
 	pushq	$0x08
 	pushq	%rax
 	lretq
@@ -123,6 +124,7 @@ setup_TSS64:
 	// pushq	%rax
 	// lretq                                    // 等价于pop rip ,pop cs selector 这里rax先出 定位到go_to_kernel 然后是0x08 代表的选择子
 
+// .quad 表示8字节  也就是这里的标号值就是函数地址 然后放入rax 最后lretq
 go_to_kernel:
 	.quad	Start_Kernel
 //=======	ignore_int
