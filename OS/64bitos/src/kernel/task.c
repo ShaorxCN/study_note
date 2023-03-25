@@ -37,7 +37,7 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
     list_add_to_before(&init_task_union.task.list, &tsk->list);
     tsk->pid++;
     tsk->state = TASK_UNINTERRUPTIBLE;
-
+    // 新开页中往下 开辟给thd
     thd = (struct thread_struct *)(tsk + 1);
     tsk->thread = thd;
 
@@ -67,37 +67,39 @@ unsigned long do_exit(unsigned long code)
 
 // 引导程序（布置执行现场环境）
 // 因为之前rsp模拟到栈顶偏移pt_regs 处 所以pop出来 然后call到rbx保存的执行入口
-// 0x38 上移到原本rdx的位置？
-extern void kernel_thread_func(void);
-__asm__(
-    "kernel_thread_func:	\n\t"
-    "	popq	%r15	\n\t"
-    "	popq	%r14	\n\t"
-    "	popq	%r13	\n\t"
-    "	popq	%r12	\n\t"
-    "	popq	%r11	\n\t"
-    "	popq	%r10	\n\t"
-    "	popq	%r9	\n\t"
-    "	popq	%r8	\n\t"
-    "	popq	%rbx	\n\t"
-    "	popq	%rcx	\n\t"
-    "	popq	%rdx	\n\t"
-    "	popq	%rsi	\n\t"
-    "	popq	%rdi	\n\t"
-    "	popq	%rbp	\n\t"
-    "	popq	%rax	\n\t"
-    "	movq	%rax,	%ds	\n\t"
-    "	popq	%rax		\n\t"
-    "	movq	%rax,	%es	\n\t"
-    "	popq	%rax		\n\t"
-    "	addq	$0x38,	%rsp	\n\t"
-    /////////////////////////////////
-    "	movq	%rdx,	%rdi	\n\t"
-    "	callq	*%rbx		\n\t"
-    // rax存放的返回值 继续给rdi作为参数 传递给do_exit
-    "	movq	%rax,	%rdi	\n\t"
-    "	callq	do_exit		\n\t");
-
+// 0x38 上移到原本rdx的位置
+// 这里一直报错 连接出来symbol对应的地址是对的 但是执行的时候 这个kernel_thread_func的线性地址会跑到一个很奇怪的地方 先改了
+// 后续发现rbx的值报错
+// extern void kernel_thread_func(void);
+// __asm__(
+//     "kernel_thread_func:	\n\t"
+void kernel_thread_func(void)
+{
+    __asm__ __volatile__("	popq	%r15	\n\t"
+                         "	popq	%r14	\n\t"
+                         "	popq	%r13	\n\t"
+                         "	popq	%r12	\n\t"
+                         "	popq	%r11	\n\t"
+                         "	popq	%r10	\n\t"
+                         "	popq	%r9	\n\t"
+                         "	popq	%r8	\n\t"
+                         "	popq	%rbx	\n\t"
+                         "	popq	%rcx	\n\t"
+                         "	popq	%rdx	\n\t"
+                         "	popq	%rsi	\n\t"
+                         "	popq	%rdi	\n\t"
+                         "	popq	%rbp	\n\t"
+                         "	popq	%rax	\n\t"
+                         "	movq	%rax,	%ds	\n\t"
+                         "	popq	%rax		\n\t"
+                         "	movq	%rax,	%es	\n\t"
+                         "	popq	%rax		\n\t"
+                         "	addq	$0x38,	%rsp	\n\t" /////////////////////////////////
+                         "	movq	%rdx,	%rdi	\n\t"
+                         "	callq	*%rbx		\n\t" // rax存放的返回值 继续给rdi作为参数 传递给do_exit
+                         "	movq	%rax,	%rdi	\n\t"
+                         "	callq	do_exit		\n\t");
+}
 // 这里实际是创建内核线程 这里都没有分配用户空间
 int kernel_thread(unsigned long (*fn)(unsigned long), unsigned long arg, unsigned long flags)
 {
@@ -119,6 +121,7 @@ int kernel_thread(unsigned long (*fn)(unsigned long), unsigned long arg, unsigne
     return do_fork(&regs, flags, 0, 0);
 }
 
+// retq 返回到 next-->rip
 void __switch_to(struct task_struct *prev, struct task_struct *next)
 {
     // 保存0环栈指针

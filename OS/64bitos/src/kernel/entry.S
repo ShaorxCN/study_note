@@ -20,7 +20,7 @@ ES  =    0x78
 RAX =    0x80
 FUNC    = 0x88
 ERRCODE = 0x90
-RIP =    0x98
+RIP =    0x98              // 这里开始时硬件自己执行的 自己区分是否涉及栈切换
 CS  =    0xa0
 RFLAGS =    0xa8
 OLDRSP =    0xb0
@@ -47,7 +47,7 @@ RESTORE_ALL:
 	popq	%rax;		
 	movq	%rax,	%es;	
 	popq	%rax;		
-	addq	$0x10,	%rsp;	       // 增加16B  为了弹出栈中的变量FUNC 和ERRCODE 这里保存着实际是中断处理程序的地址 所以要先弹出 方便iretq还原现场
+	addq	$0x10,	%rsp;	       // 增加16B  代表弹出栈中的变量FUNC 和ERRCODE 这里保存着实际是中断处理程序的地址 所以要先弹出 方便iretq还原现场
 	iretq;
 	
 #define GET_CURRENT(reg)	\

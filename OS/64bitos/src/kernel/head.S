@@ -5,6 +5,7 @@
 //如果不使用.globl修饰_start标识符的话，链接过程会出现警告ld: warning: cannot find entry symbol _start; defaulting to ffff800000100000。
 .globl _start
 
+// lds中定义了这是程序的入口
 ENTRY(_start)
 
 	mov	$0x10,	%ax
