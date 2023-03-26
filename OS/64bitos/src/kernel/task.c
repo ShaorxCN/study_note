@@ -65,11 +65,12 @@ unsigned long do_exit(unsigned long code)
         ;
 }
 
+// 内联汇编 直接写指令即可
 // 引导程序（布置执行现场环境）
 // 因为之前rsp模拟到栈顶偏移pt_regs 处 所以pop出来 然后call到rbx保存的执行入口
 // 0x38 上移到原本rdx的位置
 // 这里一直报错 连接出来symbol对应的地址是对的 但是执行的时候 这个kernel_thread_func的线性地址会跑到一个很奇怪的地方 先改了
-// 后续发现rbx的值报错
+// 后续发现rbx的值报错 这里因为换成函数的形式 所以多了一些栈的准备工作 导致pop指令错位 所以报错
 // 调用init报错
 // extern void kernel_thread_func(void);
 // __asm__(
