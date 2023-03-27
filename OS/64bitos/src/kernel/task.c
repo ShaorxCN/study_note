@@ -72,36 +72,45 @@ unsigned long do_exit(unsigned long code)
 // 这里一直报错 连接出来symbol对应的地址是对的 但是执行的时候 这个kernel_thread_func的线性地址会跑到一个很奇怪的地方 先改了
 // 后续发现rbx的值报错 这里因为换成函数的形式 所以多了一些栈的准备工作 导致pop指令错位 所以报错
 // 调用init报错
-// extern void kernel_thread_func(void);
-// __asm__(
-//     "kernel_thread_func:	\n\t"
-void kernel_thread_func(void)
+extern void kernel_thread_func(void);
+__asm__(
+    "kernel_thread_func:	\n\t"
+    // void kernel_thread_func(void)
+    // {
+    //     __asm__ __volatile__(
+    "	popq	%r15	\n\t"
+    "	popq	%r14	\n\t"
+    "	popq	%r13	\n\t"
+    "	popq	%r12	\n\t"
+    "	popq	%r11	\n\t"
+    "	popq	%r10	\n\t"
+    "	popq	%r9	\n\t"
+    "	popq	%r8	\n\t"
+    "	popq	%rbx	\n\t"
+    "	popq	%rcx	\n\t"
+    "	popq	%rdx	\n\t"
+    "	popq	%rsi	\n\t"
+    "	popq	%rdi	\n\t"
+    "	popq	%rbp	\n\t"
+    "	popq	%rax	\n\t"
+    "	movq	%rax,	%ds	\n\t"
+    "	popq	%rax		\n\t"
+    "	movq	%rax,	%es	\n\t"
+    "	popq	%rax		\n\t"
+    "	addq	$0x38,	%rsp	\n\t" /////////////////////////////////
+    "	movq	%rdx,	%rdi	\n\t"
+    "	callq	*%rbx		\n\t" // rax存放的返回值 继续给rdi作为参数 传递给do_exit
+    "	movq	%rax,	%rdi	\n\t"
+    "	callq	do_exit		\n\t");
+
+unsigned long get_kernel_fn()
 {
-    __asm__ __volatile__("	popq	%r15	\n\t"
-                         "	popq	%r14	\n\t"
-                         "	popq	%r13	\n\t"
-                         "	popq	%r12	\n\t"
-                         "	popq	%r11	\n\t"
-                         "	popq	%r10	\n\t"
-                         "	popq	%r9	\n\t"
-                         "	popq	%r8	\n\t"
-                         "	popq	%rbx	\n\t"
-                         "	popq	%rcx	\n\t"
-                         "	popq	%rdx	\n\t"
-                         "	popq	%rsi	\n\t"
-                         "	popq	%rdi	\n\t"
-                         "	popq	%rbp	\n\t"
-                         "	popq	%rax	\n\t"
-                         "	movq	%rax,	%ds	\n\t"
-                         "	popq	%rax		\n\t"
-                         "	movq	%rax,	%es	\n\t"
-                         "	popq	%rax		\n\t"
-                         "	addq	$0x38,	%rsp	\n\t" /////////////////////////////////
-                         "	movq	%rdx,	%rdi	\n\t"
-                         "	callq	*%rbx		\n\t" // rax存放的返回值 继续给rdi作为参数 传递给do_exit
-                         "	movq	%rax,	%rdi	\n\t"
-                         "	callq	do_exit		\n\t");
+    unsigned long __address;
+    __asm__ __volatile__("leaq 	kernel_thread_func(%%rip),%0\n\t"
+                         : "=r"(__address));
+    return __address;
 }
+
 // 这里实际是创建内核线程 这里都没有分配用户空间
 int kernel_thread(unsigned long (*fn)(unsigned long), unsigned long arg, unsigned long flags)
 {
@@ -118,7 +127,7 @@ int kernel_thread(unsigned long (*fn)(unsigned long), unsigned long arg, unsigne
     regs.ss = KERNEL_DS;
     regs.rflags = (1 << 9);
 
-    regs.rip = (unsigned long)kernel_thread_func;
+    regs.rip = get_kernel_fn();
 
     return do_fork(&regs, flags, 0, 0);
 }
