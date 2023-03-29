@@ -17,8 +17,8 @@ void user_level_function()
 
 unsigned long do_execve(struct pt_regs * regs)
 {
-	regs->rdx = 0x800000;	//RIP
-	regs->rcx = 0xa00000;	//RSP   这俩地址只要是未使用的即可 但是保证在同一物理页 2m rsp值栈顶
+	regs->rdx = 0x800000;	//RIP  这里等同 0xffff800000800000 高到低的index时 0 0 4 +offset 找到对应的 改为dpl 3 也就是那些都改为7结尾的了 
+	regs->rcx = 0xa00000;	//RSP   这俩地址只要是未使用的即可 但是保证在同一物理页 2m rsp值栈顶 
 	regs->rax = 1;	
 	regs->ds = 0;
 	regs->es = 0;
