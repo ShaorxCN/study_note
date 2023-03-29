@@ -6,10 +6,47 @@
 #include "linkage.h"
 #include "gate.h"
 
-// init进程创建函数
+extern void ret_system_call(void);
+
+void user_level_function()
+{
+    color_printk(RED,BLACK,"user_level_function task is running\n");
+	while(1);
+}
+
+
+unsigned long do_execve(struct pt_regs * regs)
+{
+	regs->rdx = 0x800000;	//RIP
+	regs->rcx = 0xa00000;	//RSP   这俩地址只要是未使用的即可 但是保证在同一物理页 2m rsp值栈顶
+	regs->rax = 1;	
+	regs->ds = 0;
+	regs->es = 0;
+	color_printk(RED,BLACK,"do_execve task is running\n");
+
+	memcpy(user_level_function,(void *)0x800000,1024);
+
+	return 0;
+}
+
+
+
+
+// init进程创建函数 
 unsigned long init(unsigned long arg)
 {
+    struct pt_regs * regs;
     color_printk(RED, BLACK, "init task is running,arg:%#018lx\n", arg);
+
+    current->thread->rip = (unsigned long)ret_system_call;
+    current->thread->rsp = (unsigned long)current+STACK_SIZE-sizeof(struct pt_regs);
+    regs= (struct pt_regs*)current->thread->rsp;
+
+    // 扩展init线程 使其成为进程 regs作为参数传递
+    __asm__ __volatile__("movq %1,%%rsp \n\t"
+    "pushq %2 \r\n"
+    "jmp do_execve \n\t"::"D"(regs),"m"(current->thread->rsp),"m"(current->thread->rip):"memory");
+
 
     return 1;
 }
@@ -51,7 +88,7 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
 
     // 如果不是内核进程 那么需要改为从ret_from_intr 作为入口 进入用户层
     if (!(tsk->flags & PF_KTHREAD))
-        thd->rip = regs->rip = (unsigned long)ret_from_intr;
+        thd->rip = regs->rip = (unsigned long)ret_system_call;
 
     tsk->state = TASK_RUNNING;
 
@@ -68,7 +105,7 @@ unsigned long do_exit(unsigned long code)
 // 内联汇编 直接写指令即可
 // 引导程序（布置执行现场环境）
 // 因为之前rsp模拟到栈顶偏移pt_regs 处 所以pop出来 然后call到rbx保存的执行入口
-// 0x38 上移到原本rdx的位置
+// 0x38 上移到原本rdx的位置？还是为了补足cs ip rflags等？
 // 这里一直报错 连接出来symbol对应的地址是对的 但是执行的时候 这个kernel_thread_func的线性地址会跑到一个很奇怪的地方 先改了
 // 后续发现rbx的值报错 这里因为换成函数的形式 所以多了一些栈的准备工作 导致pop指令错位 所以报错
 // 调用init报错
@@ -172,6 +209,12 @@ void task_init()
     init_mm.end_brk = memory_management_struct.end_brk;
 
     init_mm.start_stack = _stack_start;
+
+
+    // 设置IA32-sysenter-cs段选择子  0x174是IA32-sysenter_cs在msr寄存器组中的地址
+    // 低位0x08+32 = 0x28 就是user_code 64bit对应的GDT entry
+    // tip 这边后续sysexit操作时写入固定值 所以这边还是会变 比如dpl3 等于+3h 他不会去找GDT或者IDT
+    wrmsr(0x174,KERNEL_CS);
 
     // 初始化 init_thread 和tss
     set_tss64(init_thread.rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);

@@ -202,4 +202,15 @@ static inline void io_out8(unsigned short port, unsigned char value)
 						 : "memory");
 }
 
+
+/*
+	wrmsr 
+	address: msr index 通过ecx指定
+	value: write  edx 表示高32为 eax表示低32位 
+*/
+static inline void wrmsr(unsigned long address,unsigned long value)
+{
+	__asm__ __volatile__("wrmsr \n\t"::"d"(value >> 32),"a"(value&0xffffffff),"c"(address):"memory");
+}
+
 #endif

@@ -33,8 +33,6 @@ extern char _end;
 // 就是第一个进程（ldle）的内核栈顶
 extern unsigned long _stack_start;
 
-extern void ret_from_intr();
-
 // 进程状态
 
 #define TASK_RUNNING (1 << 0)

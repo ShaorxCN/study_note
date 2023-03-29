@@ -133,6 +133,19 @@ subsection name 就是子段  属于段下面的
 比如我们通常说的，代码段、数据段是segment，目标代码中的section会被链接器组织到可执行文件的各个segment中。
 .text section的内容会组装到代码段中，.data, .bss等节的内容会包含在数据段中。
 
+
+
+att寻址语法 
+offset(base,index,factor)
+
+偏移(%基址寄存器,%索引寄存器,%比例因子) #所有字段都是可选的
+偏移以及比例因子必须是常量,其余的两个必须是寄存器,如果省略任何一项将会默认为0.
+
+
+最终地址 base+index*factor+offset
+
+
+
 <div id ="link"><h2>链接</h2></div>
 
 

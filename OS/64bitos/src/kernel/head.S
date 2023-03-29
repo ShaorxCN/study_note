@@ -107,9 +107,9 @@ setup_TSS64:
 	addq	%rcx,	%rax
 	addq	$103,	%rax
 	leaq	GDT_Table(%rip),	%rdi
-	movq	%rax,	64(%rdi)
+	movq	%rax,	80(%rdi)  // tss segment offset
 	shrq	$32,	%rdx
-	movq	%rdx,	72(%rdi)
+	movq	%rdx,	88(%rdi)  // tss+1 segment offset
 
 	// 和main中的load_TR重复 报错 导致init失败 所以先注释掉
 	// mov	$0x40,	%ax
@@ -265,11 +265,13 @@ GDT_Table:
     .quad    0x0000000000000000    /*0 NULL descriptor 00*/
     .quad    0x0020980000000000    /*1 KERNEL Code 64-bit Segment 08*/
     .quad    0x0000920000000000    /*2 KERNEL Data 64-bit Segment 10*/
-    .quad    0x0020f80000000000    /*3 USER    Code 64-bit Segment 18*/
-    .quad    0x0000f20000000000    /*4 USER    Data 64-bit Segment 20*/
-    .quad    0x00cf9a000000ffff    /*5 KERNEL Code 32-bit Segment 28*/
-    .quad    0x00cf92000000ffff    /*6 KERNEL Data 32-bit Segment 30*/
-    .fill    10,8,0                /*8 ~ 9    TSS (jmp one segment <7>) in long-mode 128-bit 40*/
+	.quad    0x0000000000000000    /*3 USER      Code    32-bit Segment    18*/   
+    .quad    0x0000000000000000    /*4 USER      Data    32-bit Segment    20*/
+    .quad    0x0020f80000000000    /*5 USER    Code 64-bit Segment 28*/
+    .quad    0x0000f20000000000    /*6 USER    Data 64-bit Segment 30*/
+    .quad    0x00cf9a000000ffff    /*7 KERNEL Code 32-bit Segment 38*/
+    .quad    0x00cf92000000ffff    /*8 KERNEL Data 32-bit Segment 40*/
+    .fill    10,8,0                /*10 ~ 11    TSS (jmp one segment <9>) in long-mode 128-bit 50*/
 GDT_END:
 
 GDT_POINTER:                                            // 区分 这里是初始化结构以及定位指针 不是GDTR用 所以非48bit

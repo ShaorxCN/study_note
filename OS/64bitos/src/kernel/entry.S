@@ -59,6 +59,31 @@ ret_from_exception:
 ENTRY(ret_from_intr)
 	jmp	RESTORE_ALL	/*need rewrite*/
 
+ENTRY(ret_system_call)
+	movq %rax,0x80(%rsp)  // 将之前保存现场的rax更新为调用返回值 没有自己还是自己
+	popq %r15
+	popq %r14
+	popq %r13
+	popq %r12
+	popq %r11
+	popq %r10
+	popq %r9
+	popq %r8
+	popq %rbx
+	popq %rcx
+	popq %rdx
+	popq %rsi
+	popq %rdi
+	popq %rbp
+	popq %rax
+	movq %rax,%ds
+	popq %rax
+	movq %rax,%es
+	popq %rax                    
+	addq $0x38,%rsp
+	.byte 0x48                   // 指定sysexit操作数是64bit
+	sysexit
+
 
 ENTRY(divide_error)
 	pushq	$0                           // 压入0 占位ERRCODE 因为#DE没有ERRCODE
