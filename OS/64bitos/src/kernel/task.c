@@ -8,6 +8,15 @@
 
 extern void ret_system_call(void);
 
+unsigned long get_ret_system_call()
+{
+    unsigned long __address;
+    __asm__ __volatile__("leaq 	ret_system_call(%%rip),%0\n\t"
+                         : "=r"(__address));
+    return __address;
+}
+
+
 void user_level_function()
 {
     color_printk(RED,BLACK,"user_level_function task is running\n");
@@ -38,7 +47,7 @@ unsigned long init(unsigned long arg)
     struct pt_regs * regs;
     color_printk(RED, BLACK, "init task is running,arg:%#018lx\n", arg);
 
-    current->thread->rip = (unsigned long)ret_system_call;
+    current->thread->rip = get_ret_system_call();
     current->thread->rsp = (unsigned long)current+STACK_SIZE-sizeof(struct pt_regs);
     regs= (struct pt_regs*)current->thread->rsp;
 
