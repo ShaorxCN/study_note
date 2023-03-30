@@ -17,6 +17,8 @@ unsigned long get_ret_system_call()
 }
 
 
+
+// rax传递api index
 unsigned long system_call_function(struct pt_regs *regs)
 {
     return system_call_table[regs->rax](regs);
@@ -30,7 +32,7 @@ void user_level_function()
     // 实际不可以调用 因为之前是直接memcpy过来的  这边的定位的相对位移 也就是一开始编译的时候 所以会报错 后续借助系统api调用实现
     // color_printk(RED,BLACK,"user_level_function task is running\n");
 
-    // rax先传递1 作为api index 然后rdi传递参数 这里string
+    // rax先传递1 作为api index 然后rdi传递参数 这里string  enter 结束后回到sysexit 
     __asm__    __volatile__(    "leaq    sysexit_return_address(%%rip), %%rdx     \n\t"
                                 "movq    %%rsp,    %%rcx            \n\t"
                                 "sysenter                           \n\t"
@@ -175,7 +177,7 @@ unsigned long get_kernel_fn()
     return __address;
 }
 
-// 这里实际是创建内核线程 这里都没有分配用户空间
+// 这里实际是创建内核线程 这里都没有分配用户空间 rbx rdx指定退出r0到r3的入口
 int kernel_thread(unsigned long (*fn)(unsigned long), unsigned long arg, unsigned long flags)
 {
     struct pt_regs regs;
@@ -243,7 +245,7 @@ void task_init()
     // tip 这边后续sysexit操作时写入固定值 所以这边还是会变 比如dpl3 等于+3h 他不会去找GDT或者IDT
     wrmsr(0x174,KERNEL_CS);
     wrmsr(0x175,current->thread->rsp0);   // 指定内核栈指针
-    wrmsr(0x176,(unsigned long)system_call); // 
+    wrmsr(0x176,(unsigned long)system_call); // 指定rip 进入entry.S
     // 初始化 init_thread 和tss
     set_tss64(init_thread.rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
 

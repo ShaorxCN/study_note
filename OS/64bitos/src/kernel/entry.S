@@ -59,6 +59,7 @@ ret_from_exception:
 ENTRY(ret_from_intr)
 	jmp	RESTORE_ALL	/*need rewrite*/
 
+// 这里system_call 后面需要跟着ret_system_call 因为 call 和 ret是相对的 会返回下一条指令处也就是自动进入sysexit
 ENTRY(system_call)
 	sti                       // sysenter 会将if复位
 	subq $0x38,%rsp           // 模拟最后func等的入栈
@@ -88,7 +89,7 @@ ENTRY(system_call)
 	movq	$0x10,	%rdx;	  // 内核数据段		 	
 	movq	%rdx,	%ds;			 	
 	movq	%rdx,	%es;			 
-	movq	%rsp,	%rdi	// 栈指针作为参数传递	 	
+	movq	%rsp,	%rdi	// 栈指针作为参数传递	 这里也就是pt_regs 	
 			
 	callq	system_call_function	
 

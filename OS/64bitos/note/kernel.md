@@ -526,7 +526,7 @@ wrmsr 写入MSR寄存器 和读取一样写入时是用EDX表示高32位,EAX表�
 
 当操作数位宽为64位时，执行SYSEXIT指令后仍然保持64位宽(默认非64bit,看描述应该是32bit)；否则，这条指令将进入兼容模式（如果处理器运行在IA-32e模式下）或者进入保护模式（如果处理器运行在非64位模式下）。这里指定操作数是64bit 需要插入 0x48 参考entery.S中ENTRY(ret_system_call)
 
-这里使用sysenter实现系统api调用。也是需要提供数据在msr寄存器组和通用寄存器。sysenter/sysexit和call/ret不同的是，这里他们不会自己保存用户代码的状态信息(如rip和rsp寄存器)。且不支持内存参数方式
+这里使用sysenter实现系统api调用。也是需要提供数据在msr寄存器组和通用寄存器。sysenter/sysexit和call/ret不同的是，这里他们不会自己保存用户代码的状态信息(如rip和rsp寄存器,所以需要自己保存)。且不支持内存参数方式
 
 - IA32_SYSENTER_CS（MSR寄存器组地址174h处）。这个MSR寄存器的低16位装载的是0特权级的代码段选择子，该值也用于索引0特权级的栈段选择子（IA32_SYSENTER_CS [15:0]+8），因此其值不能为NULL。
 - IA32_SYSENTER_ESP（MSR寄存器组地址175h处）。这个MSR寄存器里的值将会被载入到RSP寄存器中，该值必须是Canonical型地址。在保护模式下，只有寄存器的低32位被载入到RSP寄存器中。
@@ -538,6 +538,16 @@ sysenter/sysexit 必须遵循一下规则:
 - SYSENTER/SYSEXIT指令使用的段描述符皆位于同一描述符表内，并且各个段描述符是相邻的。只有这样才能使处理器根据IA32_SYSENTER_CS寄存器值索引到段选择子。因为他的栈和段选择子是通过加法计算的，所以需要相邻
 - 应用程序在执行SYSENTER指令进入内核层时，必须保存程序的运行环境（尤其是RIP和RSP寄存器值），并在执行SYSEXIT指令返回应用层时恢复程序的运行环境。因为他不会保存用户程序的运行环境
 
+下面有个sysenter&sysexit的流转图:
+
+<img src="./img/sysexit&sysenter.png"><br>
+
+这里简单描述下 
+1. `switch_to` 通过`thread->rip` 切换到执行 `kernel_thread_func`. 
+2. 再通过`call` `regs->rbx`的值执行到`init`这里属于执行内核线程的逻辑.
+3. 然后这次通过设置`sysexit`所在的模块地址(`ret_system_call`)到`thread->rip`跳转到`sysexit`所在模块（中间执行了`do_execve` 设置了`sysexit`需要的`rdx` 和 `rcx` 并且复制`user_level_function` 到用户层）。
+4. 这时候通过执行`sysexit` 实现了r0->r3 执行了用户层代码。用户层代码里通过使用`sysenter`再次进入r0(调用`sysenter`之前设置了`sysexit`需要的`rdx`和`rcx`) 并且`call`了打印函数。
+5. 打印函数最后一句是`ret`指令。因为`entry.S`中`ret_system_call`紧跟着`system_call`所以打印函数返回后自动进入了执行`sysexit`的`ret_system_call`回到r3的`sysexit_return_address`处。然后结束到`while(1)`
 
 
 
