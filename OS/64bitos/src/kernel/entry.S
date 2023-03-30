@@ -59,6 +59,40 @@ ret_from_exception:
 ENTRY(ret_from_intr)
 	jmp	RESTORE_ALL	/*need rewrite*/
 
+ENTRY(system_call)
+	sti                       // sysenter 会将if复位
+	subq $0x38,%rsp           // 模拟最后func等的入栈
+	cld
+
+	pushq	%rax;				 	
+	movq	%es,	%rax;			 	
+	pushq	%rax;				 	
+	movq	%ds,	%rax;			 	
+	pushq	%rax;				 	
+	xorq	%rax,	%rax;			 	
+	pushq	%rbp;				 	
+	pushq	%rdi;				 	
+	pushq	%rsi;				 	
+	pushq	%rdx;				 	
+	pushq	%rcx;				 
+	pushq	%rbx;				 	
+	pushq	%r8;				 	
+	pushq	%r9;				 	
+	pushq	%r10;				 
+	pushq	%r11;				 
+	pushq	%r12;				 	
+	pushq	%r13;				 
+	pushq	%r14;				 	
+	pushq	%r15;
+
+	movq	$0x10,	%rdx;	  // 内核数据段		 	
+	movq	%rdx,	%ds;			 	
+	movq	%rdx,	%es;			 
+	movq	%rsp,	%rdi	// 栈指针作为参数传递	 	
+			
+	callq	system_call_function	
+
+
 ENTRY(ret_system_call)
 	movq %rax,0x80(%rsp)  // 将之前保存现场的rax更新为调用返回值 没有自己还是自己
 	popq %r15
