@@ -8,6 +8,8 @@
 /*
 	(type *)0)->member 基于0地址获取member的偏移 也就是成员再结构体内的偏移
 	然后再用ptr减去这个偏移就是结构体变量的基地址
+
+	tip: 宏函数中 最后一个表达式的值就是返回值
 */
 #define container_of(ptr, type, member)                                     \
 	({                                                                      \
