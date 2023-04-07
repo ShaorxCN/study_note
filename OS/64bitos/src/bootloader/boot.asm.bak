@@ -2,34 +2,32 @@
 ;比如偏移量是4B 不加org默认是0000但是boot默认加载到7c00那么当还是用0000+4b肯定访问不到7C4B.一般相对是程序放置位置+相对偏移量定址
 ;编译阶段只能得出相对偏移地址，自然是程序开始处为零点算偏移，只有实际运行加载才能得出程序放置位置，但是某些固定 比如引导现阶段肯定是7c00 可以通过org直接指定
 ;当然这里也可以通过DS/ES设置为7c0h实现可以不带org
-;此处修改为新的版本 FAT等格式做了修改 比如FAT目录占扇区数量改为12
 org 0x7c00   
 BaseOfStack equ 0x7c00 ;BaseOfStack 标识符 等价于 0x7c00  equ指令 让左边等于右边 但是不会为标识符分配空间 标识符无法重名 无法重新定义。
 BaseOfLoader equ 0x1000
 OffsetOfLoader equ 0x00
 
 RootDirSectors equ 14        ; 目录区占14个扇区
-SectorNumOfRootDirStart equ 25;1+12+12 = 25   ;这里参考LBA和CHS的区别 LBA线性描述 扇区从0开始CHS1开始 因为同密度导致扇区数不一致[柱面就是磁道 内向外 越来越大]
+SectorNumOfRootDirStart equ 19;1+9+9 = 19   ;这里参考LBA和CHS的区别 LBA线性描述 扇区从0开始CHS1开始 因为同密度导致扇区数不一致[柱面就是磁道 内向外 越来越大]
 SectorNumOfFAT1Start equ 1  ; FAT1开始扇区号
 ;平衡目录和数据区初始簇号的插值 这里一个扇区就是一个簇 然后标准里数据区起始簇号是2 所以减了2  
 ;数据区地址=根目录起始扇区号+根目录所占扇区数+值-2 -2放到前面就是17
-; 此处更新了BPB_FATSz16 变为23 24+1-2 其实每个簇的扇区数量变了  常量不好用了
-SectorBalance equ 23  
+SectorBalance equ 17  
 
     jmp short Label_Start
     nop
     BS_OEMName db 'MINEboot'        ;一定要放在这儿 代表软盘的描述信息 参见介绍里的引导扇区结构图
-    BPB_BytesPerSec dw 0x200
-    BPB_SecPerClus db 0x8
-    BPB_RevdSecCnt dw 0x1
-    BPB_NumFATs db 0x2
-    BPB_RootEntCnt dw 0xe0
-    BPB_TotSec16 dw 0x7d82
+    BPB_BytesPerSec dw 512
+    BPB_SecPerClus db 1
+    BPB_RevdSecCnt dw 1
+    BPB_NumFATs db 2
+    BPB_RootEntCnt dw 224
+    BPB_TotSec16 dw 2880
     BPB_Media db  0xf0
-    BPB_FATSz16 dw 0xc
+    BPB_FATSz16 dw 9
     ; 每个磁道的扇区数
-    BPB_SecPerTrk dw 0x3f
-    BPB_NumHeads dw 0xff
+    BPB_SecPerTrk dw 18
+    BPB_NumHeads dw 2
     BPB_hiddSec dd 0
     BPB_TotSec32 dd 0
     BS_DrvNum db 0
@@ -127,7 +125,7 @@ Label_Go_On:
     inc di
     jmp Label_Cmp_FileName
 Label_Different:
-    and di,0ffe0h       ;低于20h的位归零 相当于 指向本条目的开头 目录项大小是32字节
+    and di,0ffe0h       ;低于20h的位归零 相当于 指向本条目的开头
     add di,20h          ;+20h 跳转到下一个条目
     mov si,LoaderFileName
     jmp Label_Search_For_LoaderBin
@@ -152,18 +150,13 @@ Label_No_LoaderBin:
 
 ;======  found loader.bin name in root director struct
 Label_FileName_Found:
-    mov cx,[BPB_SecPerClus]
+    mov ax,RootDirSectors
     and di,0ffe0h        ;到当前条目开始位置
     add di,01ah          ;根据目录结构 +26到DIR_FstClus 2个字节
-    mov ax,word [es:di]  ; DIR_FstClus 保存到ax
-    push ax              ;备份DIR_FstClus
-    sub ax,2             ; FAT表项号/簇号减去2（被占用的两个）再乘以每簇扇区数目 
-    mul cl
-
-    mov cx,RootDirSectors
-
-    add cx,ax            ;加上目录扇区的偏移 得到目标扇区
-    ; add cx,SectorBalance ;加上平衡值得到目标扇区 注释掉 改为计算
+    mov cx,word [es:di]  ; DIR_FstClus 保存到cx
+    push cx              ;备份DIR_FstClus
+    add cx,ax            ;加上目录扇区的偏移
+    add cx,SectorBalance ;加上平衡值得到目标扇区
     mov ax,BaseOfLoader  
     mov es,ax          
     mov bx,OffsetOfLoader  ;设置目标地址
@@ -179,42 +172,48 @@ Label_Go_On_Loading_File:
     pop bx
     pop ax
 
-
-    mov cx,[BPB_SecPerClus]
-    call Func_ReadOneSector    ;读取扇区 cx是读取的扇区数量
+    mov cl,1
+    call Func_ReadOneSector    ;读取一个扇区
     pop ax                     ;此时ax = DIR_FstClus的值
     call Func_GetFATEntry      ;查看表项 是否需要继续读取
     cmp ax,0fffh               ;是否是最后一个簇 是的话就结束
     jz Label_File_Loaded
     push ax
-
-    mov cx,[BPB_SecPerClus]  ; 再次计算 开始的扇区no
-    sub ax,2
-    mul cl
-
     mov dx,RootDirSectors
-    add ax,dx                ;
-    ; add ax,SectorBalance
-    add ax,SectorNumOfRootDirStart
-
-    add bx,0x1000     ; add bx,[BPB_bytesPerSec] 缓冲区位移 也就是这边512*8=1000h 这个根据实际FAT配置定 示例是16M USB_FDD
+    add ax,dx
+    add ax,SectorBalance
+    add bx,[BPB_BytesPerSec]
     jmp Label_Go_On_Loading_File
 Label_File_Loaded:
     jmp BaseOfLoader:OffsetOfLoader  ;跳转到loader的部分  boot结束
 ;====== read one sector from floppy  ax中存放目标扇区号 cl中放需要读取的扇区个数
 Func_ReadOneSector:
-    push	dword	00h
-	push	dword	eax
-	push	word	es
-	push	word	bx
-	push	word	cx
-	push	word	10h
-	mov	ah,	42h	;read
-	mov	dl,	00h
-	mov	si,	sp
-	int	13h
-	add	sp,	10h
-	ret
+    push bp
+    mov bp,sp
+    ; 上面复制了sp 这边-2 相当于预留了两个byte 空间 用以下面的mov byte bp默认ss
+    sub esp,2
+    mov byte [bp-2],cl ;备份cl 调用方传入的读取的扇区数量
+    push bx
+    mov bl,[BPB_SecPerTrk]
+    ;被除数在ax 商在al 余数在ah 这里ax需要调用方放入
+    div bl
+    inc ah ;余数+1 得到chs的扇区号 
+    mov cl,ah ; 13h中断起始扇区号存储在CL
+    mov dh,al ; 商放到dh
+    shr al,1 ;右移一位得到柱面号(商/BPB_NumHeads)
+    mov ch,al ; 获得柱面号 13h中断要求放在CH
+    and dh,1 ;得到磁头号 
+    pop bx  ;恢复bx
+    mov dl,[BS_DrvNum];保存驱动器号
+Label_Go_On_Reading:
+    mov ah,2
+    mov al,byte [bp-2];之前的cl保存到al 读取al个扇区 
+    int 13h   ; ah=2 表示读扇区  ch柱面 cl扇区 dh磁头 dl=驱动器
+    ;jc = jump if Carry 读取错误则CF=1 那就继续跳转到Label_Go_On_Reading
+    jc Label_Go_On_Reading
+    add esp,2
+    pop bp
+    ret
 ;======  get FAT Entry 每个表项1.5B
 Func_GetFATEntry:
     push es
