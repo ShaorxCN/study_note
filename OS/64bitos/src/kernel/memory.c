@@ -175,10 +175,12 @@ void init_memory()
     {
         color_printk(ORANGE, BLACK, "Address:%#018lx\tLength:%#018lx\tType:%#010x\n", p->address, p->length, p->type);
 
+        unsigned long tmp = 0;
+
         if (p->type == 1)
             TotalMem += p->length;
-        memory_management_struct.e820[i].address += p->address;
-        memory_management_struct.e820[i].length += p->length;
+        memory_management_struct.e820[i].address = p->address;
+        memory_management_struct.e820[i].length = p->length;
         memory_management_struct.e820[i].type = p->type;
         memory_management_struct.e820_length = i;
 

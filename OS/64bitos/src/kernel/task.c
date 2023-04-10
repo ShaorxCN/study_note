@@ -114,6 +114,8 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
     thd->rsp0 = (unsigned long)tsk + STACK_SIZE;
     thd->rip = regs->rip;
     thd->rsp = (unsigned long)tsk + STACK_SIZE - sizeof(struct pt_regs);
+    thd->fs = KERNEL_DS;
+    thd->gs = KERNEL_DS;
 
     // 如果不是内核进程 那么需要改为从ret_from_intr 作为入口 进入用户层
     if (!(tsk->flags & PF_KTHREAD))

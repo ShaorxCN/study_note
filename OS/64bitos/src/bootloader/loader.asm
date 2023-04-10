@@ -184,7 +184,7 @@ Label_Go_On_Loading_File:
 
     push	cx
 	push	eax
-	push	fs
+	;push	fs
 	push	edi
 	push	ds
 	push	esi
@@ -214,7 +214,7 @@ Label_Mov_Kernel:
     pop esi
     pop ds
     pop edi
-    pop fs
+    ; pop fs
     pop eax
     pop cx
 
