@@ -27,3 +27,23 @@ makefile lds等说明见kernel.md 和tips.md
 8. 在pages_struct页面管理结构体组之后的4 KB边界对齐处，保存着系统可用物理页的页面区域结构struct Zone。
 9. 从zones_struct页面区域结构体组之后的线性地址开始，到线性地址0xFFFF8000,FFFFFFFF处的这段地址空间用于固定内存映射。固定内存映射的好处是，内核只需通过简单的计算（减去固定值PAGE_OFFSET = 0xFFFF8000,00000000）便可知道线性地址对应的物理地址。
 10. 剩余线性地址空间（0xFFFF8001,00000000 ~ 0xFFFFFFFF,FFFFFFFF）用于非固定映射。超过4 GB的物理地址空间可随意映射到此地址空间，并允许物理页面的重复映射（同一物理页在页表中存在多处映射）。
+
+
+
+cpuid指令部分说明:
+
+<img src="./img/cpuid_op.png">
+
+部分cpu最大功能号:
+
+<img src="./img/maxop_cpuid.png">
+
+cpuid查询步进等信息:
+
+<img src="./img/cpuid_version.png">
+
+对于主功能号01h保存在ECX和EDX寄存器值，寄存器保存的返回值描述了处理器可支持的功能:0表示不支持 1表示支持
+
+<img src="./img/return_bit_cpuid.png">
+
+s
