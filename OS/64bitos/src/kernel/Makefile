@@ -15,8 +15,8 @@ all: system
 # -b target 指定输入文件的文件格式
 # -z muldefs 允许重复定义 遇见重复定义的时候 只使用第一个
 # 总体ld命令中式按照文件顺序一次链接的 所以head.o 需要作为第一个才能放到lds文件中指定的位置
-system:	head.o entry.o main.o printk.o trap.o memory.o interrupt.o task.o
-	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o  main.o printk.o trap.o interrupt.o task.o -T Kernel.lds 
+system:	head.o entry.o main.o printk.o trap.o memory.o interrupt.o task.o cpu.o
+	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o  main.o printk.o trap.o interrupt.o task.o cpu.o -T Kernel.lds 
 
 head.o:	head.S
 # -E表示仅预处理 不执行编译汇编或者链接 预处理 编译生成汇编代码一类  汇编生成obj
@@ -41,6 +41,8 @@ memory.o: memory.c
 interrupt.o: interrupt.c
 	gcc  $(CFLAGS) -c interrupt.c
 task.o: task.c
-	gcc  $(CFLAGS) -c task.c	
+	gcc  $(CFLAGS) -c task.c
+cpu.o: cpu.c
+	gcc  $(CFLAGS) -c cpu.c		
 clean:
 	rm -rf *.o *.s~ *.s *.S~ *.c~ *.h~ system  Makefile~ Kernel.lds~ kernel.bin 

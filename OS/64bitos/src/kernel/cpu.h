@@ -14,4 +14,6 @@ static inline void get_cpuid(unsigned int Mop, unsigned int Sop, unsigned int *a
                          : "0"(Mop), "2"(Sop));
 }
 
+void init_cpu(void);
+
 #endif
