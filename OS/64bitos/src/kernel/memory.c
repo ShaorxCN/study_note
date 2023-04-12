@@ -339,3 +339,101 @@ void init_memory()
 
     flush_tlb();
 }
+
+// 从指定页开始释放number个页面
+void free_pages(struct Page *page, int number)
+{
+    int i = 0;
+    if (page == NULL)
+    {
+        color_printk(RED, BLACK, "free_pages() ERRPR: page is invalid\n");
+        return;
+    }
+
+    if (number >= 64 || number <= 0)
+    {
+        color_printk(RED, BLACK, "free_pages() ERROR: number is invalid\n");
+        return;
+    }
+
+    for (i = 0; i < number; i++, page++)
+    {
+        // 对应的bit位复位
+        *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) &= ~(1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64);
+        page->zone_struct->page_using_count--;
+        page->zone_struct->page_free_count++;
+        page->attribute = 0;
+    }
+}
+
+// 内核内存块申请(从slab中申请) size是代表的块大小 参考kmalloc_cache_size 用于申请小于1页的内存
+void *kmalloc(unsigned long size, unsigned long gfg_flages)
+{
+    int i, j;
+    struct Slab *slab = NULL;
+    if (size > 1048576)
+    {
+        color_printk(RED, BLACK, "kmalloc() ERROR: kmalloc size too long:%08d\n", size);
+        return NULL;
+    }
+    for (i = 0; i < 16; i++)
+        if (kmalloc_cache_size[i].size >= size)
+            break;
+    slab = kmalloc_cache_size[i].cache_pool;
+
+    if (kmalloc_cache_size[i].total_free != 0)
+    {
+        do
+        {
+            if (slab->free_count == 0)
+                slab = container_of(list_next(&slab->list), struct Slab, list);
+            else
+                break;
+        } while (slab != kmalloc_cache_size[i].cache_pool);
+    }
+    else
+    {
+        slab = kmalloc_create(kmalloc_cache_size[i].size);
+
+        if (slab == NULL)
+        {
+            color_printk(BLUE, BLACK, "kmalloc()->kmalloc_create()=>slab == NULL\n");
+            return NULL;
+        }
+
+        kmalloc_cache_size[i].total_free += slab->color_count;
+
+        color_printk(BLUE, BLACK, "kmalloc()->kmalloc_create()<=size:%#010x\n", kmalloc_cache_size[i].size); ///////
+
+        list_add_to_before(&kmalloc_cache_size[i].cache_pool->list, &slab->list);
+    }
+
+    for (j = 0; j < slab->color_count; j++)
+    {
+        if (*(slab->color_map + (j >> 6)) == 0xffffffffffffffffUL)
+        {
+            j += 63;
+            continue;
+        }
+
+        if ((*(slab->color_map + (j >> 6)) & (1UL << (j % 64))) == 0)
+        {
+            *(slab->color_map + (j >> 6)) |= 1UL << (j % 64);
+            slab->using_count++;
+            slab->free_count--;
+
+            kmalloc_cache_size[i].total_free--;
+            kmalloc_cache_size[i].total_using++;
+
+            return (void *)((char *)slab->Vaddress + kmalloc_cache_size[i].size * j);
+        }
+    }
+
+    color_printk(BLUE, BLACK, "kmalloc() ERROR: no memory can alloc\n");
+    return NULL;
+}
+struct Slab_cache *slab_create(unsigned long size, void *(*constructor)(void *Vaddress, unsigned long arg), void *(*destructor)(void *Vaddress, unsigned long arg), unsigned long arg)
+{
+    struct Slab_cache *slab_cache = NULL;
+    slab_cache = (struct Slab_cache *)kmalloc(sizeof(struct Slab_cache), 0);
+}

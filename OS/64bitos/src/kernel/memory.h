@@ -221,6 +221,65 @@ struct Zone
 };
 
 extern struct Global_Memory_Descriptor memory_management_struct;
+
+struct Slab
+{
+    // 链接其他的slab 通过container_of
+    struct List list;
+
+    //  所使用页面
+    struct Page *Page;
+
+    unsigned long using_count;
+    unsigned long free_count;
+
+    // void 指针 无类型指针
+    void *Vaddress;
+
+    unsigned long color_length;
+    unsigned long color_count;
+
+    unsigned long *color_map;
+}
+
+struct Slab_cache
+{
+    unsigned long size;
+    unsigned long total_using;
+    unsigned long total_free;
+
+    struct Slab *cache_pool;
+    struct Slab *cache_dma_pool;
+
+    // 包含的函数指针的指针？returnType (*pointerName)(param list) 这是函数指针的类型 函数名是函数指针
+    void *(*constructor)(void *Vaddress, unsigned long arg);
+    void *(*destructor)(void *Vaddress, unsigned long arg);
+};
+
+/*
+    kmalloc`s struct
+*/
+
+struct Slab_cache kmalloc_cache_size[16] =
+    {
+        {32, 0, 0, NULL, NULL, NULL, NULL},
+        {64, 0, 0, NULL, NULL, NULL, NULL},
+        {128, 0, 0, NULL, NULL, NULL, NULL},
+        {256, 0, 0, NULL, NULL, NULL, NULL},
+        {512, 0, 0, NULL, NULL, NULL, NULL},
+        {1024, 0, 0, NULL, NULL, NULL, NULL}, // 1KB
+        {2048, 0, 0, NULL, NULL, NULL, NULL},
+        {4096, 0, 0, NULL, NULL, NULL, NULL}, // 4KB
+        {8192, 0, 0, NULL, NULL, NULL, NULL},
+        {16384, 0, 0, NULL, NULL, NULL, NULL},
+        {32768, 0, 0, NULL, NULL, NULL, NULL},
+        {65536, 0, 0, NULL, NULL, NULL, NULL},  // 64KB
+        {131072, 0, 0, NULL, NULL, NULL, NULL}, // 128KB
+        {262144, 0, 0, NULL, NULL, NULL, NULL},
+        {524288, 0, 0, NULL, NULL, NULL, NULL},
+        {1048576, 0, 0, NULL, NULL, NULL, NULL}, // 1MB
+};
+
 struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags);
 unsigned long page_init(struct Page *page, unsigned long flags);
 unsigned long page_clean(struct Page *page);
