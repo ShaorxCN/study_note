@@ -228,7 +228,7 @@ struct Slab
     struct List list;
 
     //  所使用页面
-    struct Page *Page;
+    struct Page *page;
 
     unsigned long using_count;
     unsigned long free_count;
@@ -245,13 +245,13 @@ struct Slab
 struct Slab_cache
 {
     unsigned long size;
-    unsigned long total_using;
-    unsigned long total_free;
+    unsigned long total_using; // 总共占用
+    unsigned long total_free;  // 总共可用
 
     struct Slab *cache_pool;
     struct Slab *cache_dma_pool;
 
-    // 包含的函数指针的指针？returnType (*pointerName)(param list) 这是函数指针的类型 函数名是函数指针
+    // 包含的函数指针returnType (*pointerName)(param list) 这是函数指针的类型 函数名是函数指针
     void *(*constructor)(void *Vaddress, unsigned long arg);
     void *(*destructor)(void *Vaddress, unsigned long arg);
 };
@@ -280,10 +280,9 @@ struct Slab_cache kmalloc_cache_size[16] =
         {1048576, 0, 0, NULL, NULL, NULL, NULL}, // 1MB
 };
 
-struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags);
-unsigned long page_init(struct Page *page, unsigned long flags);
-unsigned long page_clean(struct Page *page);
-void init_memory();
+// size按照long向后对齐
+#define SIZEOF_LONG_ALIGN(size) ((size + sizeof(long) - 1) & ~(sizeof(long) - 1))
+
 /*
     刷新tlb  x86下当对cr3写入值得时候会自动刷新
 */
@@ -314,4 +313,9 @@ static inline unsigned long *Get_gdt()
         : "memory");
     return tmp;
 }
+
+struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags);
+unsigned long page_init(struct Page *page, unsigned long flags);
+unsigned long page_clean(struct Page *page);
+void init_memory();
 #endif

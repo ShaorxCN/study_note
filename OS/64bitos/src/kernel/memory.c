@@ -366,7 +366,108 @@ void free_pages(struct Page *page, int number)
     }
 }
 
+//  创建slab
+struct Slab *kmalloc_create(unsigned long size)
+{
+    int i;
+    struct Slab *slab = NULL;
+    struct Page *page = NULL;
+    unsigned long *vaddresss = NULL;
+    long structsize = 0;
+
+    page = alloc_pages(ZONE_NORMAL, 1, 0);
+
+    if (page == NULL)
+    {
+        color_printk(RED, BLACK, "kmalloc_create()->alloc_pages()=>page == NULL\n");
+        return NULL;
+    }
+
+    page_init(page, PG_Kernel);
+
+    switch (size)
+    {
+        ////////////////////这个尺寸将slab和color_map就存储在该页面上
+
+    case 32:
+    case 64:
+    case 128:
+    case 256:
+    case 512:
+
+        vaddresss = Phy_To_Virt(page->PHY_address);
+        structsize = sizeof(struct Slab) + PAGE_2M_SIZE / size / 8; // slab结构体大小加color_map大小
+
+        // slab以及map存储在页尾部
+        slab = (struct Slab *)((unsigned char *)vaddresss + PAGE_2M_SIZE - structsize);
+        slab->color_map = (unsigned long *)((unsigned long *)slab + sizeof(struct Slab));
+
+        slab->free_count = (PAGE_2M_SIZE - (PAGE_2M_SIZE / size / 8) - sizeof(struct Slab)) / size;
+        slab->using_count = 0;
+        slab->color_count = slab->free_count;
+        slab->Vaddress = vaddresss;
+        slab->page = page;
+        list_init(&slab->list);
+
+        // todo understand
+        slab->color_length = ((slab->color_count + sizeof(unsigned long) * 8 - 1) >> 6) << 3;
+        memset(slab->color_map, 0xff, slab->color_length);
+
+        for (i = 0; i < slab->color_count; i++)
+            *(slab->color_map + (i >> 6)) ^= 1UL << i % 64;
+
+        break;
+
+        ///////////////////kmalloc slab and map,not in 2M page anymore
+
+    case 1024: // 1KB
+    case 2048:
+    case 4096: // 4KB
+    case 8192:
+    case 16384:
+
+        //////////////////color_map is a very short buffer.
+
+    case 32768:
+    case 65536:
+    case 131072: // 128KB
+    case 262144:
+    case 524288:
+    case 1048576: // 1MB
+
+        slab = (struct Slab *)kmalloc(sizeof(struct Slab), 0);
+
+        slab->free_count = PAGE_2M_SIZE / size;
+        slab->using_count = 0;
+        slab->color_count = slab->free_count;
+
+        slab->color_length = ((slab->color_count + sizeof(unsigned long) * 8 - 1) >> 6) << 3;
+
+        slab->color_map = (unsigned long *)kmalloc(slab->color_length, 0);
+        memset(slab->color_map, 0xff, slab->color_length);
+
+        slab->Vaddress = Phy_To_Virt(page->PHY_address);
+        slab->page = page;
+        list_init(&slab->list);
+
+        for (i = 0; i < slab->color_count; i++)
+            *(slab->color_map + (i >> 6)) ^= 1UL << i % 64;
+
+        break;
+
+    default:
+
+        color_printk(RED, BLACK, "kmalloc_create() ERROR: wrong size:%08d\n", size);
+        free_pages(page, 1);
+
+        return NULL;
+    }
+
+    return slab;
+}
+
 // 内核内存块申请(从slab中申请) size是代表的块大小 参考kmalloc_cache_size 用于申请小于1页的内存
+// size 不能大于1MB  且位 2^N次方 返回void *
 void *kmalloc(unsigned long size, unsigned long gfg_flages)
 {
     int i, j;
@@ -376,6 +477,8 @@ void *kmalloc(unsigned long size, unsigned long gfg_flages)
         color_printk(RED, BLACK, "kmalloc() ERROR: kmalloc size too long:%08d\n", size);
         return NULL;
     }
+
+    // 查找现有的尺寸满足的slab_cache
     for (i = 0; i < 16; i++)
         if (kmalloc_cache_size[i].size >= size)
             break;
@@ -389,10 +492,11 @@ void *kmalloc(unsigned long size, unsigned long gfg_flages)
                 slab = container_of(list_next(&slab->list), struct Slab, list);
             else
                 break;
-        } while (slab != kmalloc_cache_size[i].cache_pool);
+        } while (slab != kmalloc_cache_size[i].cache_pool); // 进来的时候是相等的 如果进来的不满足 那么就是往下
     }
     else
     {
+        // 如果没有找到适合的 那就创建新的slab
         slab = kmalloc_create(kmalloc_cache_size[i].size);
 
         if (slab == NULL)
@@ -432,8 +536,180 @@ void *kmalloc(unsigned long size, unsigned long gfg_flages)
     color_printk(BLUE, BLACK, "kmalloc() ERROR: no memory can alloc\n");
     return NULL;
 }
+
+// 根据地址释放对应的页以及slab 这边仅用于slab slab_cache color_map(可能再本页 可能不在)
+unsigned long kfree(void *address)
+{
+    int i;
+    int index;
+
+    struct Slab *slab = NULL;
+    // 获取页地址
+    void *page_base_address = (void *)((unsigned long)address & PAGE_2M_MASK);
+
+    // 尝试去找是哪个slab_cache的
+    for (i = 0; i < 16; i++)
+    {
+        slab = kmalloc_cache_size[i].cache_pool;
+        do
+        {
+            // 命中后
+            if (slab->Vaddress == page_base_address)
+            {
+
+                // 找到是第几个块
+                index = (address - slab->Vaddress) / kmalloc_cache_size[i].size;
+
+                // 64bit一个ul 然后对应index的余数复位应该 释放原来肯定是1了
+                *(slab->color_map + (index >> 6)) ^= 1UL << index % 64;
+
+                slab->free_count++;
+                slab->using_count--;
+
+                kmalloc_cache_size[i].total_free++;
+                kmalloc_cache_size[i].total_using--;
+
+                // 当前slab空闲 整个cache的空闲数量大于该slab可用数量的1.5X  并且该slab不是手动创建的第一个静态slab 那么考虑回收释放
+                if ((slab->using_count == 0) && (kmalloc_cache_size[i].total_free >= slab->color_count * 3 / 2) && (kmalloc_cache_size[i].cache_pool != slab))
+                {
+                    switch (kmalloc_cache_size[i].size)
+                    {
+                        ////////////////////slab + map in 2M page
+
+                    case 32:
+                    case 64:
+                    case 128:
+                    case 256:
+                    case 512:
+                        list_del(&slab->list);
+                        kmalloc_cache_size[i].total_free -= slab->color_count;
+
+                        page_clean(slab->page);
+                        free_pages(slab->page, 1);
+                        break;
+                    // 这边map以及slab在其他slab 所以需要重新kfree(map) kfree(slab)
+                    default:
+                        list_del(&slab->list);
+                        kmalloc_cache_size[i].total_free -= slab->color_count;
+
+                        kfree(slab->color_map);
+
+                        page_clean(slab->page);
+                        free_pages(slab->page, 1);
+                        kfree(slab);
+                        break;
+                    }
+                }
+
+                return 1;
+            }
+            else
+                slab = container_of(list_next(&slab->list), struct Slab, list); // 未命中则是找下一个slab node
+
+        } while (slab != kmalloc_cache_size[i].cache_pool);
+    }
+
+    color_printk(RED, BLACK, "kfree() ERROR: can`t free memory\n");
+
+    return 0;
+}
+// 创建slab_cache
 struct Slab_cache *slab_create(unsigned long size, void *(*constructor)(void *Vaddress, unsigned long arg), void *(*destructor)(void *Vaddress, unsigned long arg), unsigned long arg)
 {
     struct Slab_cache *slab_cache = NULL;
     slab_cache = (struct Slab_cache *)kmalloc(sizeof(struct Slab_cache), 0);
+
+    if (slab_cache == NULL)
+    {
+        color_printk(RED, BLACK, "slab_create()->kmalloc()=>slab_cache == NULL\n");
+        return NULL;
+    }
+
+    memset(slab_cache, 0, sizeof(struct Slab_cache));
+
+    slab_cache->size = SIZEOF_LONG_ALIGN(size);
+    slab_cache->total_using = 0;
+    slab_cache->total_free = 0;
+    slab_cache->cache_pool = (struct Slab *)kmalloc(sizeof(struct Slab), 0);
+
+    if (slab_cache->cache_pool == NULL)
+    {
+        color_printk(RED, BLACK, "slab_create()->kmalloc()=>slab_cache->cache_pool == NULL\n");
+        kfree(slab_cache);
+        return NULL;
+    }
+
+    memset(slab_cache->cache_pool, 0, sizeof(struct Slab));
+
+    slab_cache->cache_dma_pool = NULL;
+    slab_cache->constructor = constructor;
+    slab_cache->destructor = destructor;
+    list_init(&slab_cache->cache_pool->list);
+
+    slab_cache->cache_pool->page = alloc_pages(ZONE_NORMAL, 1, 0);
+    if (slab_cache->cache_pool->page == NULL)
+    {
+        color_printk(RED, BLACK, "slab_create()->alloc_pages()=>slab_cache->cache_pool->page == NULL\n");
+        kfree(slab_cache->cache_pool);
+        kfree(slab_cache);
+        return NULL;
+    }
+
+    page_init(slab_cache->cache_pool->page, PG_Kernel);
+
+    slab_cache->cache_pool->using_count = 0;
+    slab_cache->cache_pool->free_count = PAGE_2M_SIZE / slab_cache->size;
+    slab_cache->total_free = slab_cache->cache_pool->free_count;
+    slab_cache->cache_pool->Vaddress = Phy_To_Virt(slab_cache->cache_pool->page);
+    slab_cache->cache_pool->color_count = slab_cache->cache_pool->free_count;
+    // 64一个单位 所以按照count+64-1 右移6向下对齐 然后左移3算到字节为单位
+    slab_cache->cache_pool->color_length = ((slab_cache->cache_pool->color_count + sizeof(unsigned long) * 8 - 1) >> 6) << 3;
+
+    slab_cache->cache_pool->color_map = (unsigned long *)kmalloc(slab_cache->cache_pool->color_length, 0);
+    if (slab_cache->cache_pool->color_map == NULL)
+    {
+        color_printk(RED, BLACK, "slab_create()->kmalloc()=>slab_cache->cache_pool->color_map == NULL\n");
+        free_page(slab_cache->cache_pool->page, 1);
+        kfree(slab_cache->cache_pool);
+        kfree(slab_cache);
+        return NULL;
+    }
+
+    memset(slab_cache->cache_pool->color_map, 0, slab_cache->cache_pool->color_length);
+
+    return slab_cache;
+}
+
+// 释放slab_cache 首先没有占用的  然后一次释放所有list slab(包括里面的两个引用page 和 map)   最后再释放slab_cache
+unsigned long slab_destroy(struct Slab_cache *slab_cache)
+{
+    struct Slab *slab_p = slab_cache->cache_pool;
+    struct Slab *tmp_slab = NULL;
+
+    if (slab_cache->total_using != 0)
+    {
+        color_printk(RED, BLACK, "slab_cache->total_using != 0\n");
+        return 0;
+    }
+
+    while (!list_is_empty(&slab_p->list))
+    {
+        tmp_slab = slab_p;
+        slab_p = container_of(list_next(&slab_p->list), struct Slab, list);
+
+        list_del(&tmp_slab->list);
+        kfree(tmp_slab->color_map);
+
+        page_clean(tmp_slab->page);
+        free_pages(tmp_slab->page, 1);
+        kfree(tmp_slab);
+    }
+
+    kfree(slab_p->color_map);
+    page_clean(slab_p->page);
+    free_pages(slab_p->page, 1);
+    kfree(slab_p);
+    kfree(slab_cache);
+
+    return 1;
 }
