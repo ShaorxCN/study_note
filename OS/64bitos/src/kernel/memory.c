@@ -366,7 +366,7 @@ void free_pages(struct Page *page, int number)
     }
 }
 
-//  创建slab
+//  创建 slab
 struct Slab *kmalloc_create(unsigned long size)
 {
     int i;
@@ -409,7 +409,7 @@ struct Slab *kmalloc_create(unsigned long size)
         slab->page = page;
         list_init(&slab->list);
 
-        // todo understand
+        // 这个length是字节计算的  所以是按照count 根据unsigned long的长度(64寻址单位下是8B)乘以8bit -1右移来实现向上取整  得到需要多少个unsigned long  最后有个乘以8 是字节数量(所以默认是8 byte ul)
         slab->color_length = ((slab->color_count + sizeof(unsigned long) * 8 - 1) >> 6) << 3;
         memset(slab->color_map, 0xff, slab->color_length);
 
@@ -537,7 +537,7 @@ void *kmalloc(unsigned long size, unsigned long gfg_flages)
     return NULL;
 }
 
-// 根据地址释放对应的页以及slab 这边仅用于slab slab_cache color_map(可能再本页 可能不在)
+// 根据地址释放修改对应的页以及slab属性
 unsigned long kfree(void *address)
 {
     int i;
@@ -712,4 +712,135 @@ unsigned long slab_destroy(struct Slab_cache *slab_cache)
     kfree(slab_cache);
 
     return 1;
+}
+
+// 从指定slab_cache 中申请一个size内存单位
+void *slab_malloc(struct Slab_cache *slab_cache, unsigned long arg)
+{
+    struct Slab *slab_p = slab_cache->cache_pool;
+    struct Slab *tmp_slab = NULL;
+    int j = 0;
+
+    // 已经用完 申请新的slab
+    if (slab_cache->total_free == 0)
+    {
+        tmp_slab = (struct Slab *)kmalloc(sizeof(struct Slab), 0);
+
+        if (tmp_slab == NULL)
+        {
+            color_printk(RED, BLACK, "slab_malloc()->kmalloc()=>tmp_slab == NULL\n");
+            return NULL;
+        }
+
+        memset(tmp_slab, 0, sizeof(struct Slab));
+        list_init(&tmp_slab->list);
+
+        tmp_slab->page = alloc_pages(ZONE_NORMAL, 1, 0);
+        if (tmp_slab->page == NULL)
+        {
+            color_printk(RED, BLACK, "slab_malloc()->alloc_pages()=>tmp_slab->page == NULL\n");
+            kfree(tmp_slab);
+            return NULL;
+        }
+
+        page_init(tmp_slab->page, PG_Kernel);
+        tmp_slab->using_count = PAGE_2M_SIZE / slab_cache->size;
+        tmp_slab->free_count = tmp_slab->using_count;
+        tmp_slab->Vaddress = Phy_To_Virt(tmp_slab->page->PHY_address);
+
+        tmp_slab->color_count = tmp_slab->free_count;
+        tmp_slab->color_length = ((tmp_slab->color_count + sizeof(unsigned long) * 8 - 1) >> 6) << 3;
+        tmp_slab->color_map = (unsigned long *)kmalloc(tmp_slab->color_length, 0);
+
+        if (tmp_slab->color_map == NULL)
+        {
+            color_printk(RED, BLACK, "slab_malloc()->kmalloc()=>tmp_slab->color_map == NULL\n");
+            free_pages(tmp_slab->page, 1);
+            kfree(tmp_slab);
+            return NULL;
+        }
+
+        memset(tmp_slab->color_map, 0, tmp_slab->color_length);
+        list_add_to_behind(&slab_cache->cache_pool->list, &tmp_slab->list);
+        slab_cache->total_free += tmp_slab->color_count;
+
+        for (j = 0; j < tmp_slab->color_count; j++)
+        {
+            // 这个有必要吗 新建逻辑中的的然后memset的是0 都是空闲的
+            if ((*(tmp_slab->color_map + (j >> 6)) & (1UL << (j % 64))) == 0)
+            {
+                // 置位
+                *(tmp_slab->color_map + (j >> 6)) |= 1UL << (j % 64);
+
+                tmp_slab->using_count++;
+                tmp_slab->free_count--;
+
+                slab_cache->total_using++;
+                slab_cache->total_free--;
+
+                if (slab_cache->constructor != NULL)
+                {
+                    return slab_cache->constructor((char *)tmp_slab->Vaddress + slab_cache->size * j, arg);
+                }
+                else
+                {
+                    return (void *)((char *)tmp_slab->Vaddress + slab_cache->size * j);
+                }
+            }
+        }
+    }
+    else
+    {
+        // 这边就从现存中的找
+        do
+        {
+            if (slab_p->free_count == 0)
+            {
+                slab_p = container_of(list_next(&slab_p->list), struct Slab, list);
+                continue;
+            }
+
+            for (j = 0; j < slab_p->color_count; j++)
+            {
+
+                if (*(slab_p->color_map + (j >> 6)) == 0xffffffffffffffffUL)
+                {
+                    j += 63;
+                    continue;
+                }
+
+                if ((*(slab_p->color_map + (j >> 6)) & (1UL << (j % 64))) == 0)
+                {
+                    *(slab_p->color_map + (j >> 6)) |= 1UL << (j % 64);
+
+                    slab_p->using_count++;
+                    slab_p->free_count--;
+
+                    slab_cache->total_using++;
+                    slab_cache->total_free--;
+
+                    if (slab_cache->constructor != NULL)
+                    {
+                        return slab_cache->constructor((char *)slab_p->Vaddress + slab_cache->size * j, arg);
+                    }
+                    else
+                    {
+                        return (void *)((char *)slab_p->Vaddress + slab_cache->size * j);
+                    }
+                }
+            }
+        } while (slab_p != slab_cache->cache_pool);
+    }
+
+    color_printk(RED, BLACK, "slab_malloc() ERROR: can`t alloc\n");
+    if (tmp_slab != NULL)
+    {
+        list_del(&tmp_slab->list);
+        kfree(tmp_slab->color_map);
+        page_clean(tmp_slab->page);
+        free_pages(tmp_slab->page, 1);
+        kfree(tmp_slab);
+    }
+
+    return NULL;
 }

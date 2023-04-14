@@ -39,7 +39,7 @@ static inline void list_init(struct List *list)
 	list->next = list;
 }
 
-// node加到entry后面
+// add加到entry后面
 static inline void list_add_to_behind(struct List *entry, struct List *add) ////add to entry behind
 {
 	add->next = entry->next;
