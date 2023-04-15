@@ -21,7 +21,8 @@ void Start_Kernel(void)
 	// loader设置了显示模式(（模式号：0x180、分辨率：1440×900、颜色深度：32 bit）)
 	// Loader引导加载程序设置的显示模式可支持32位颜色深度的像素点，其中0~7位代表蓝颜色(0x000000ff）)，8~15位代表绿颜色(0x0000ff00)，16~23位代表红颜色(0x00ff0000)，白色(0x00ffffff) 24~31位是保留位。
 	// 这32 bit位值可以组成16 M种不同的颜色，可以表现出真实的色彩
-	int *addr = (int *)0xffff800000a00000;
+	// 内存管理扩充后 vbe帧缓存区起始线性地址变化 实际物理地址 0xA0000
+	int *addr = (int *)0xffff800003000000;
 	int i;
 
 	Pos.XResolution = 1440;
@@ -33,7 +34,9 @@ void Start_Kernel(void)
 	Pos.XCharSize = 8;
 	Pos.YCharSize = 16;
 
-	Pos.FB_addr = (int *)0xffff800000a00000;
+	// 内存管理扩充后 vbe帧缓存区起始线性地址变化 实际物理地址 0xA0000
+	// Pos.FB_addr = (int *)0xffff800000a00000;
+	Pos.FB_addr = (int *)0xffff800003000000;
 	Pos.FB_length = (Pos.XResolution * Pos.YResolution * 4 + PAGE_4K_SIZE - 1) & PAGE_4K_MASK;
 
 	// 色条展示部分
@@ -86,6 +89,42 @@ void Start_Kernel(void)
 	memory_management_struct.end_brk = (unsigned long)&_end;
 	color_printk(RED, BLACK, "memory init \n");
 	init_memory();
+
+	color_printk(RED, BLACK, "slab init \n");
+	slab_init();
+	color_printk(ORANGE, BLACK, "4.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
+
+	color_printk(WHITE, BLACK, "kmalloc test\n");
+	struct Page *page = NULL;
+	void *tmp = NULL;
+	struct Slab *slab = NULL;
+	for (i = 0; i < 16; i++)
+	{
+		color_printk(RED, BLACK, "size:%#010x\t", kmalloc_cache_size[i].size);
+		color_printk(RED, BLACK, "color_map(before):%#018lx\t", *kmalloc_cache_size[i].cache_pool->color_map);
+		tmp = kmalloc(kmalloc_cache_size[i].size, 0);
+		if (tmp == NULL)
+			color_printk(RED, BLACK, "kmalloc size:%#010x ERROR\n", kmalloc_cache_size[i].size);
+		color_printk(RED, BLACK, "color_map(middle):%#018lx\t", *kmalloc_cache_size[i].cache_pool->color_map);
+		kfree(tmp);
+		color_printk(RED, BLACK, "color_map(after):%#018lx\n", *kmalloc_cache_size[i].cache_pool->color_map);
+	}
+
+	kmalloc(kmalloc_cache_size[15].size, 0);
+	kmalloc(kmalloc_cache_size[15].size, 0);
+	kmalloc(kmalloc_cache_size[15].size, 0);
+	kmalloc(kmalloc_cache_size[15].size, 0);
+	kmalloc(kmalloc_cache_size[15].size, 0);
+	kmalloc(kmalloc_cache_size[15].size, 0);
+	kmalloc(kmalloc_cache_size[15].size, 0);
+
+	color_printk(RED, BLACK, "color_map(0):%#018lx,%#018lx\n", kmalloc_cache_size[15].cache_pool->color_map, *kmalloc_cache_size[15].cache_pool->color_map);
+	slab = container_of(list_next(&kmalloc_cache_size[15].cache_pool->list), struct Slab, list);
+	color_printk(RED, BLACK, "color_map(1):%#018lx,%#018lx\n", slab->color_map, *slab->color_map);
+	slab = container_of(list_next(&slab->list), struct Slab, list);
+	color_printk(RED, BLACK, "color_map(2):%#018lx,%#018lx\n", slab->color_map, *slab->color_map);
+	slab = container_of(list_next(&slab->list), struct Slab, list);
+	color_printk(RED, BLACK, "color_map(3):%#018lx,%#018lx\n", slab->color_map, *slab->color_map);
 
 	// i = 1/0;
 	// i = *(int *)0xffff80000aa00000;

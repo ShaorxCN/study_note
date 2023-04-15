@@ -22,13 +22,16 @@
 #define PAGE_2M_MASK (~(PAGE_2M_SIZE - 1))
 #define PAGE_4K_MASK (~(PAGE_4K_SIZE - 1))
 
-// 对齐宏 向上对齐
+// 对齐宏 向高对齐
 #define PAGE_2M_ALIGN(addr) (((unsigned long)(addr) + PAGE_2M_SIZE - 1) & PAGE_2M_MASK)
 #define PAGE_4K_ALIGN(addr) (((unsigned long)(addr) + PAGE_4K_SIZE - 1) & PAGE_4K_MASK)
 
 // 前10m空间可用的 虚拟地址和物理地址的转换 这里看header.S 最后PDE 0-4 entry
 #define Virt_To_Phy(addr) ((unsigned long)(addr)-PAGE_OFFSET)
 #define Phy_To_Virt(addr) ((unsigned long *)((unsigned long)(addr) + PAGE_OFFSET))
+
+#define Virt_To_2M_Page(kaddr) (memory_management_struct.pages_struct + (Virt_To_Phy(kaddr) >> PAGE_2M_SHIFT))
+#define Phy_to_2M_Page(kaddr) (memory_management_struct.pages_struct + ((unsigned long)(kaddr) >> PAGE_2M_SHIFT))
 
 ////page table attribute
 
@@ -206,7 +209,7 @@ int ZONE_UNMAPED_INDEX = 0; // above 4GB? RAM,unmapped in pagetable
 
 struct Zone
 {
-    struct Page *pages_group;         // 页数组指针
+    struct Page *pages_group;         // 该zone内的页数组指针 pages_struct中某个index开始
     unsigned long pages_length;       // 页数量
     unsigned long zone_start_address; // 对齐后区域开始地址
     unsigned long zone_end_address;   // 对齐后区域结束地址
@@ -240,7 +243,7 @@ struct Slab
     unsigned long color_count;
 
     unsigned long *color_map;
-}
+};
 
 struct Slab_cache
 {
@@ -260,6 +263,7 @@ struct Slab_cache
     kmalloc`s struct
 */
 
+// 紧跟内存管理后面 手动分配 slab_init
 struct Slab_cache kmalloc_cache_size[16] =
     {
         {32, 0, 0, NULL, NULL, NULL, NULL},
@@ -317,5 +321,14 @@ static inline unsigned long *Get_gdt()
 struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags);
 unsigned long page_init(struct Page *page, unsigned long flags);
 unsigned long page_clean(struct Page *page);
+void free_pages(struct Page *page, int number);
 void init_memory();
+unsigned long slab_free(struct Slab_cache *slab_cache, void *address, unsigned long arg);
+void *slab_malloc(struct Slab_cache *slab_cache, unsigned long arg);
+unsigned long slab_init();
+void *kmalloc(unsigned long size, unsigned long flags);
+struct Slab *kmalloc_create(unsigned long size);
+unsigned long kfree(void *address);
+struct Slab_cache *slab_create(unsigned long size, void *(*constructor)(void *Vaddress, unsigned long arg), void *(*destructor)(void *Vaddress, unsigned long arg), unsigned long arg);
+unsigned long slab_destroy(struct Slab_cache *slab_cache);
 #endif

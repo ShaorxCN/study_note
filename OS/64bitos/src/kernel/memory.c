@@ -88,7 +88,7 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
         z = memory_management_struct.zones_struct + i;
         start = z->zone_start_address >> PAGE_2M_SHIFT; //   起始地址对应的页index
         end = z->zone_end_address >> PAGE_2M_SHIFT;
-        length = z->zone_length >> PAGE_2M_SHIFT; // 该zone总归多少页
+        length = z->zone_length >> PAGE_2M_SHIFT; // 该zone总共多少页
 
         // 位图位图检索次数 第多少页模64得出某个unsinged long中得位置 tmp就是这个bitsmap中剩下得
         tmp = 64 - start % 64;
@@ -199,9 +199,9 @@ void init_memory()
         unsigned long start, end;
         if (memory_management_struct.e820[i].type != 1)
             continue;
-        // 向上对齐的开始地址
+        // 对齐的开始地址
         start = PAGE_2M_ALIGN(memory_management_struct.e820[i].address);
-        // 向下对齐的结束地址 多的截断
+        // 对齐的结束地址 多的截断
         end = ((memory_management_struct.e820[i].address + memory_management_struct.e820[i].length) >> PAGE_2M_SHIFT) << PAGE_2M_SHIFT;
         // 不够就算了
         if (end <= start)
@@ -400,7 +400,7 @@ struct Slab *kmalloc_create(unsigned long size)
 
         // slab以及map存储在页尾部
         slab = (struct Slab *)((unsigned char *)vaddresss + PAGE_2M_SIZE - structsize);
-        slab->color_map = (unsigned long *)((unsigned long *)slab + sizeof(struct Slab));
+        slab->color_map = (unsigned long *)((unsigned char *)slab + sizeof(struct Slab));
 
         slab->free_count = (PAGE_2M_SIZE - (PAGE_2M_SIZE / size / 8) - sizeof(struct Slab)) / size;
         slab->using_count = 0;
@@ -426,7 +426,8 @@ struct Slab *kmalloc_create(unsigned long size)
     case 8192:
     case 16384:
 
-        //////////////////color_map is a very short buffer.
+        //////////////////color_map is a very short buffer.这边因为尺寸变大了 如果还是放在同一个page中 会造成浪费 比如1个2m页
+        // 但是尺寸是1m那么只能容纳一个块 因为剩下的如果存放slab colormap等的话
 
     case 32768:
     case 65536:
@@ -468,6 +469,7 @@ struct Slab *kmalloc_create(unsigned long size)
 
 // 内核内存块申请(从slab中申请) size是代表的块大小 参考kmalloc_cache_size 用于申请小于1页的内存
 // size 不能大于1MB  且位 2^N次方 返回void *
+// 通用内存申请函数
 void *kmalloc(unsigned long size, unsigned long gfg_flages)
 {
     int i, j;
@@ -537,7 +539,7 @@ void *kmalloc(unsigned long size, unsigned long gfg_flages)
     return NULL;
 }
 
-// 根据地址释放修改对应的页以及slab属性
+// 根据地址释放修改对应的页以及slab属性 通用内存释放程序
 unsigned long kfree(void *address)
 {
     int i;
@@ -669,7 +671,7 @@ struct Slab_cache *slab_create(unsigned long size, void *(*constructor)(void *Va
     if (slab_cache->cache_pool->color_map == NULL)
     {
         color_printk(RED, BLACK, "slab_create()->kmalloc()=>slab_cache->cache_pool->color_map == NULL\n");
-        free_page(slab_cache->cache_pool->page, 1);
+        free_pages(slab_cache->cache_pool->page, 1);
         kfree(slab_cache->cache_pool);
         kfree(slab_cache);
         return NULL;
@@ -843,4 +845,132 @@ void *slab_malloc(struct Slab_cache *slab_cache, unsigned long arg)
     }
 
     return NULL;
+}
+
+// 指定slab_cache 释放指定地址的内存块
+unsigned long slab_free(struct Slab_cache *slab_cache, void *address, unsigned long arg)
+{
+    struct Slab *slab_p = slab_cache->cache_pool;
+    int index = 0;
+
+    do
+    {
+        // 在该page内
+        if (slab_p->Vaddress <= address && address < slab_p->Vaddress + PAGE_2M_SIZE)
+        {
+            index = (address - slab_p->Vaddress) / slab_cache->size;
+            *(slab_p->color_map + (index >> 6)) ^= 1UL << index % 64;
+
+            slab_cache->total_using--;
+            slab_cache->total_free++;
+
+            if (slab_cache->destructor != NULL)
+            {
+                //  GNU 中则允许，因为在默认情况下，GNU 认为 void * 和 char * 一样 这样来做计算操作 即以字节为单位
+                slab_cache->destructor((char *)slab_p->Vaddress + slab_cache->size * index, arg);
+            }
+
+            if ((slab_p->using_count == 0) && (slab_cache->total_free >= slab_p->color_count * 3 / 2))
+            {
+                list_del(&slab_p->list);
+                slab_cache->total_free -= slab_p->color_count;
+
+                kfree(slab_p->color_map);
+
+                page_clean(slab_p->page);
+                free_pages(slab_p->page, 1);
+                kfree(slab_p);
+            }
+
+            return 1;
+        }
+        else
+        {
+            // 查找下一个slab
+            slab_p = container_of(list_next(&slab_p->list), struct Slab, list);
+            continue;
+        }
+    } while (slab_p != slab_cache->cache_pool);
+
+    color_printk(RED, BLACK, "slab_free() ERROR: address not in slab\n");
+
+    return 0;
+}
+
+// 手动创建基础的slab_cache 每个先创建一个slab  这里手动计算页地址 然后返回来去计算以及设置页属性 其实可以通过alloc_pages函数
+// 这里为了保证此时分配的内存页连续排列在扩展空间之后
+unsigned long slab_init()
+{
+    struct Page *page = NULL;
+    unsigned long *virtual = NULL; // get a free page and set to empty page table and return the virtual address
+    unsigned long i, j;
+
+    unsigned long tmp_address = memory_management_struct.end_of_struct;
+
+    for (i = 0; i < 16; i++)
+    {
+        kmalloc_cache_size[i].cache_pool = (struct Slab *)memory_management_struct.end_of_struct;
+        memory_management_struct.end_of_struct = memory_management_struct.end_of_struct + sizeof(struct Slab) + sizeof(long) * 10;
+
+        list_init(&kmalloc_cache_size[i].cache_pool->list);
+
+        //////////// init sizeof struct Slab of cache size
+
+        kmalloc_cache_size[i].cache_pool->using_count = 0;
+        kmalloc_cache_size[i].cache_pool->free_count = PAGE_2M_SIZE / kmalloc_cache_size[i].size;
+
+        kmalloc_cache_size[i].cache_pool->color_length = ((PAGE_2M_SIZE / kmalloc_cache_size[i].size + sizeof(unsigned long) * 8 - 1) >> 6) << 3;
+
+        kmalloc_cache_size[i].cache_pool->color_count = kmalloc_cache_size[i].cache_pool->free_count;
+
+        kmalloc_cache_size[i].cache_pool->color_map = (unsigned long *)memory_management_struct.end_of_struct;
+
+        memory_management_struct.end_of_struct = (unsigned long)(memory_management_struct.end_of_struct + kmalloc_cache_size[i].cache_pool->color_length + sizeof(long) * 10) & (~(sizeof(long) - 1));
+
+        memset(kmalloc_cache_size[i].cache_pool->color_map, 0xff, kmalloc_cache_size[i].cache_pool->color_length);
+
+        for (j = 0; j < kmalloc_cache_size[i].cache_pool->color_count; j++)
+            *(kmalloc_cache_size[i].cache_pool->color_map + (j >> 6)) ^= 1UL << j % 64;
+
+        kmalloc_cache_size[i].total_free = kmalloc_cache_size[i].cache_pool->color_count;
+        kmalloc_cache_size[i].total_using = 0;
+    }
+
+    ////////////	init page for kernel code and memory management struct
+
+    // 重新计算内核代码占用的页以及更新对应属性
+    i = Virt_To_Phy(memory_management_struct.end_of_struct) >> PAGE_2M_SHIFT;
+
+    for (j = PAGE_2M_ALIGN(Virt_To_Phy(tmp_address)) >> PAGE_2M_SHIFT; j <= i; j++)
+    {
+        page = memory_management_struct.pages_struct + j;
+        *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64;
+        page->zone_struct->page_using_count++;
+        page->zone_struct->page_free_count--;
+        page_init(page, PG_PTable_Maped | PG_Kernel_Init | PG_Kernel);
+    }
+
+    color_printk(ORANGE, BLACK, "2.memory_management_struct.bits_map:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
+
+    // 为slab_cache 分配页
+    for (i = 0; i < 16; i++)
+    {
+        virtual = (unsigned long *)((memory_management_struct.end_of_struct + PAGE_2M_SIZE * i + PAGE_2M_SIZE - 1) & PAGE_2M_MASK);
+        page = Virt_To_2M_Page(virtual);
+
+        *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64;
+        page->zone_struct->page_using_count++;
+        page->zone_struct->page_free_count--;
+
+        page_init(page, PG_PTable_Maped | PG_Kernel_Init | PG_Kernel);
+
+        kmalloc_cache_size[i].cache_pool->page = page;
+        kmalloc_cache_size[i].cache_pool->Vaddress = virtual;
+    }
+
+    color_printk(ORANGE, BLACK, "3.memory_management_struct.bits_map:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
+
+    color_printk(ORANGE, BLACK, "start_code:%#018lx,end_code:%#018lx,end_data:%#018lx,end_brk:%#018lx,end_of_struct:%#018lx\n", memory_management_struct.start_code, memory_management_struct.end_code, memory_management_struct.end_data, memory_management_struct.end_brk, memory_management_struct.end_of_struct);
+
+    return 1;
 }

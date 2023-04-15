@@ -237,6 +237,26 @@ __PDE:
 	.quad	0x400087
 	.quad	0x600087
 	.quad	0x800087
+	.quad   0xa00087
+    .quad   0xc00087
+    .quad   0xe00087
+    .quad   0x1000087
+    .quad   0x1200087
+    .quad   0x1400087
+    .quad   0x1600087
+    .quad   0x1800087
+    .quad   0x1a00087
+    .quad   0x1c00087
+    .quad   0x1e00087
+    .quad   0x2000087
+    .quad   0x2200087
+    .quad   0x2400087
+    .quad   0x2600087
+	.quad   0x2800087
+    .quad   0x2a00087
+    .quad   0x2c00087
+    .quad   0x2e00087
+
 	.quad	0xe0000087		 //  35-21bit  0000 1110 0000 0000 0000 0000 0000 0000 0000 =0xe0000000   /*0x a00000*/ 这里的index是30-21 也就是 000000101 就是index=5 就是这里
 	.quad	0xe0200087
 	.quad	0xe0400087
