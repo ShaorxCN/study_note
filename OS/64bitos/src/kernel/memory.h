@@ -10,6 +10,7 @@
 // 初始线性地址
 #define PAGE_OFFSET ((unsigned long)0xffff800000000000)
 
+#define PAGE_GDT_SHIFT 39
 // 大中小分页的size 容量
 #define PAGE_1G_SHIFT 30
 #define PAGE_2M_SHIFT 21
@@ -160,35 +161,20 @@ struct Global_Memory_Descriptor
 
 ////struct page attribute (alloc_pages flags)
 
-//
+//	mapped=1 or un-mapped=0
 #define PG_PTable_Maped (1 << 0)
 
-//
+//	内核初始化程序 init-code=1 or 非内核初始化程序 normal-code/data=0
 #define PG_Kernel_Init (1 << 1)
 
-//
-#define PG_Referenced (1 << 2)
+//	设备寄存器/内存 device=1 or 物理空间内存 memory=0
+#define PG_Device (1 << 2)
 
-//
-#define PG_Dirty (1 << 3)
+//	内核层地址空间 kernel=1 or 应用层地址空间 user=0
+#define PG_Kernel (1 << 3)
 
-//
-#define PG_Active (1 << 4)
-
-//
-#define PG_Up_To_Date (1 << 5)
-
-//
-#define PG_Device (1 << 6)
-
-//
-#define PG_Kernel (1 << 7)
-
-//
-#define PG_K_Share_To_U (1 << 8)
-
-//
-#define PG_Slab (1 << 9)
+//	已被共享的内存也 shared=1 or 未被共享的内存也 single-use=0
+#define PG_Shared (1 << 4)
 
 struct Page
 {
@@ -211,7 +197,7 @@ struct Zone
 {
     struct Page *pages_group;         // 该zone内的页数组指针 pages_struct中某个index开始
     unsigned long pages_length;       // 页数量
-    unsigned long zone_start_address; // 对齐后区域开始地址
+    unsigned long zone_start_address; // 对齐后区域开始地址 物理
     unsigned long zone_end_address;   // 对齐后区域结束地址
     unsigned long zone_length;        // 对齐后内存长度
     unsigned long attribute;          // 属性
@@ -321,6 +307,8 @@ static inline unsigned long *Get_gdt()
 struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags);
 unsigned long page_init(struct Page *page, unsigned long flags);
 unsigned long page_clean(struct Page *page);
+unsigned long get_page_attribute(struct Page *page);
+unsigned long set_page_attribute(struct Page *page, unsigned long flags);
 void free_pages(struct Page *page, int number);
 void init_memory();
 unsigned long slab_free(struct Slab_cache *slab_cache, void *address, unsigned long arg);
@@ -331,4 +319,5 @@ struct Slab *kmalloc_create(unsigned long size);
 unsigned long kfree(void *address);
 struct Slab_cache *slab_create(unsigned long size, void *(*constructor)(void *Vaddress, unsigned long arg), void *(*destructor)(void *Vaddress, unsigned long arg), unsigned long arg);
 unsigned long slab_destroy(struct Slab_cache *slab_cache);
+void pagetable_init();
 #endif

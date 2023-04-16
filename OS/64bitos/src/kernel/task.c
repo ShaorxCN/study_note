@@ -16,8 +16,6 @@ unsigned long get_ret_system_call()
     return __address;
 }
 
-
-
 // rax传递api index
 unsigned long system_call_function(struct pt_regs *regs)
 {
@@ -25,57 +23,57 @@ unsigned long system_call_function(struct pt_regs *regs)
 }
 
 void user_level_function()
-{   
+{
     long ret = 0;
-    char string[]="user_level_function task is running\n\n";
+    char string[] = "user_level_function task is running\n\n";
 
     // 实际不可以调用 因为之前是直接memcpy过来的  这边的定位的相对位移 也就是一开始编译的时候 所以会报错 后续借助系统api调用实现
     // color_printk(RED,BLACK,"user_level_function task is running\n");
 
-    // rax先传递1 作为api index 然后rdi传递参数 这里string  enter 结束后回到sysexit 
-    __asm__    __volatile__(    "leaq    sysexit_return_address(%%rip), %%rdx     \n\t"
-                                "movq    %%rsp,    %%rcx            \n\t"
-                                "sysenter                           \n\t"
-                                "sysexit_return_address:            \n\t"
-                                :"=a"(ret):"0"(1),"D"(string):"memory");
+    // rax先传递1 作为api index 然后rdi传递参数 这里string  enter 结束后回到sysexit
+    __asm__ __volatile__("leaq    sysexit_return_address(%%rip), %%rdx     \n\t"
+                         "movq    %%rsp,    %%rcx            \n\t"
+                         "sysenter                           \n\t"
+                         "sysexit_return_address:            \n\t"
+                         : "=a"(ret)
+                         : "0"(1), "D"(string)
+                         : "memory");
 
     // color_printk(RED,BLACK,"user_level_function task called sysenter,ret:%ld\n",ret);
-	while(1);
+    while (1)
+        ;
 }
 
-
-unsigned long do_execve(struct pt_regs * regs)
+unsigned long do_execve(struct pt_regs *regs)
 {
-	regs->rdx = 0x800000;	//RIP  这里等同 0xffff800000800000 高到低的index时 0 0 4 +offset 找到对应的 改为dpl 3 也就是那些都改为7结尾的了 
-	regs->rcx = 0xa00000;	//RSP   这俩地址只要是未使用的即可 但是保证在同一物理页 2m rsp值栈顶 
-	regs->rax = 1;	
-	regs->ds = 0;
-	regs->es = 0;
-	color_printk(RED,BLACK,"do_execve task is running\n");
+    regs->rdx = 0x800000; // RIP  这里等同 0xffff800000800000 高到低的index时 0 0 4 +offset 找到对应的 改为dpl 3 也就是那些都改为7结尾的了
+    regs->rcx = 0xa00000; // RSP   这俩地址只要是未使用的即可 但是保证在同一物理页 2m rsp值栈顶
+    regs->rax = 1;
+    regs->ds = 0;
+    regs->es = 0;
+    color_printk(RED, BLACK, "do_execve task is running\n");
 
-	memcpy(user_level_function,(void *)0x800000,1024);
+    memcpy(user_level_function, (void *)0x800000, 1024);
 
-	return 0;
+    return 0;
 }
 
-
-
-
-// init进程创建函数 
+// init进程创建函数
 unsigned long init(unsigned long arg)
 {
-    struct pt_regs * regs;
+    struct pt_regs *regs;
     color_printk(RED, BLACK, "init task is running,arg:%#018lx\n", arg);
 
     current->thread->rip = (unsigned long)ret_system_call;
-    current->thread->rsp = (unsigned long)current+STACK_SIZE-sizeof(struct pt_regs);
-    regs= (struct pt_regs*)current->thread->rsp;
+    current->thread->rsp = (unsigned long)current + STACK_SIZE - sizeof(struct pt_regs);
+    regs = (struct pt_regs *)current->thread->rsp;
 
     // 扩展init线程 使其成为进程 regs作为参数传递
     __asm__ __volatile__("movq %1,%%rsp \n\t"
-    "pushq %2 \r\n"
-    "jmp do_execve \n\t"::"D"(regs),"m"(current->thread->rsp),"m"(current->thread->rip):"memory");
-
+                         "pushq %2 \r\n"
+                         "jmp do_execve \n\t" ::"D"(regs),
+                         "m"(current->thread->rsp), "m"(current->thread->rip)
+                         : "memory");
 
     return 1;
 }
@@ -89,7 +87,7 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
     // 分配物理内存页
     color_printk(WHITE, BLACK, "alloc_pages,bitmap:%#018lx\n", *memory_management_struct.bits_map);
 
-    p = alloc_pages(ZONE_NORMAL, 1, PG_PTable_Maped | PG_Active | PG_Kernel);
+    p = alloc_pages(ZONE_NORMAL, 1, PG_PTable_Maped | PG_Kernel);
 
     color_printk(WHITE, BLACK, "alloc_pages,bitmap:%#018lx\n", *memory_management_struct.bits_map);
 
@@ -241,13 +239,12 @@ void task_init()
 
     init_mm.start_stack = _stack_start;
 
-
     // 设置IA32-sysenter-cs段选择子  0x174是IA32-sysenter_cs在msr寄存器组中的地址
     // 低位0x08+32 = 0x28 就是user_code 64bit对应的GDT entry
     // tip 这边后续sysexit操作时写入固定值 所以这边还是会变 比如dpl3 等于+3h 他不会去找GDT或者IDT
-    wrmsr(0x174,KERNEL_CS);
-    wrmsr(0x175,current->thread->rsp0);   // 指定内核栈指针
-    wrmsr(0x176,(unsigned long)system_call); // 指定rip 进入entry.S
+    wrmsr(0x174, KERNEL_CS);
+    wrmsr(0x175, current->thread->rsp0);      // 指定内核栈指针
+    wrmsr(0x176, (unsigned long)system_call); // 指定rip 进入entry.S
     // 初始化 init_thread 和tss
     set_tss64(init_thread.rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
 

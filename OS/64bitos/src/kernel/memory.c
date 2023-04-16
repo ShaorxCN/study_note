@@ -2,31 +2,43 @@
 #include "memory.h"
 
 // 这里做页属性赋值
+// 简化逻辑 使之更加独立
 unsigned long page_init(struct Page *page, unsigned long flags)
 {
-    // 如果页属性 是0 说明之前没被引用过 不是得话 如果flag引用或者共享等 则只增加引用次数 包括它得zone(说明是互斥？)
-    if (!page->attribute)
+
+    page->attribute |= flags;
+
+    if (!page->reference_count || (page->attribute & PG_Shared))
     {
-        // 第一次使用 所以这个逻辑
-        *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64;
-        page->attribute = flags;
-        page->reference_count++;
-        page->zone_struct->page_using_count++;
-        page->zone_struct->page_free_count--;
-        page->zone_struct->total_pages_link++;
-    }
-    else if ((page->attribute & PG_Referenced) || (page->attribute & PG_K_Share_To_U) || (flags & PG_Referenced) || (flags & PG_K_Share_To_U))
-    {
-        page->attribute |= flags;
         page->reference_count++;
         page->zone_struct->total_pages_link++;
     }
-    else
-    {
-        *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64;
-        page->attribute |= flags;
-    }
-    return 0;
+
+    return 1;
+
+    // // 如果页属性 是0 说明之前没被引用过 不是得话 如果flag引用或者共享等 则只增加引用次数 包括它得zone(说明是互斥？)
+    // if (!page->attribute)
+    // {
+    //     // 第一次使用 所以这个逻辑
+    //     *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64;
+    //     page->attribute = flags;
+    //     page->reference_count++;
+    //     page->zone_struct->page_using_count++;
+    //     page->zone_struct->page_free_count--;
+    //     page->zone_struct->total_pages_link++;
+    // }
+    // else if ((page->attribute & PG_Referenced) || (page->attribute & PG_K_Share_To_U) || (flags & PG_Referenced) || (flags & PG_K_Share_To_U))
+    // {
+    //     page->attribute |= flags;
+    //     page->reference_count++;
+    //     page->zone_struct->total_pages_link++;
+    // }
+    // else
+    // {
+    //     *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64;
+    //     page->attribute |= flags;
+    // }
+    // return 0;
 }
 
 /*
@@ -44,28 +56,36 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
 {
     int i;
     unsigned long page = 0;
+    unsigned long attribute = 0;
 
     int zone_start = 0;
     int zone_end = 0;
+
+    if (number >= 64 || number <= 0)
+    {
+        color_printk(RED, BLACK, "alloc_pages() ERROR: number is invalid\n");
+        return NULL;
+    }
 
     switch (zone_select)
     {
     case ZONE_DMA:
         zone_start = 0;
         zone_end = ZONE_DMA_INDEX;
+        attribute = PG_PTable_Maped;
 
         break;
 
     case ZONE_NORMAL:
         zone_start = ZONE_DMA_INDEX;
         zone_end = ZONE_NORMAL_INDEX;
-
+        attribute = PG_PTable_Maped;
         break;
 
     case ZONE_UNMAPED:
         zone_start = ZONE_UNMAPED_INDEX;
         zone_end = memory_management_struct.zones_size - 1;
-
+        attribute = 0;
         break;
 
     default:
@@ -100,28 +120,36 @@ struct Page *alloc_pages(int zone_select, int number, unsigned long page_flags)
             unsigned long *p = memory_management_struct.bits_map + (j >> 6);
             unsigned long shift = j % 64; // 对应开始页的模64 找到单个位图中的offset
             unsigned long k;
-            // 这里和外部得循环实际是看有没有连续得number个 如果第一次就分配成功 直接goto return了
-            for (k = shift; k < 64 - shift; k++)
+            unsigned long num = (1UL << number) - 1; // 需要的页数bit位数量的低位变为1 然后下面的按位and 来实现判断
+
+            for (k = shift; k < 64; k++)
             {
-                // 简化就是 !(a&b)   a：先获取64个bit位 (说明就是申请64个?)b:是申请64个吗？是的话就是全部要0 否则就是对应得1（因为左移得范围是0-63 如果64就需要单独处理） 反正就是吧需要得个数位置都置1
-                // 那么如果a是0 也就是都没占用 那么a&b就是0 ！进入逻辑
-                if (!(((*p >> k) | (*(p + 1) << (64 - k))) & (number == 64 ? 0xffffffffffffffffUL : ((1UL << number) - 1))))
+
+                // 如果k=0 那么就是*(p+1)<<64 会超出64寄存器最大位宽 根据运行模式的不同 IA-32e下 超过范围的数据将被屏蔽。 (p + 1) << 64等价于*(p + 1) << 0
+                // 结果异常 所以用*p参数与计算
+                /**
+                 * if(!(a?(b|c:d))&e)
+                 * k不等于0 则说明某个map上非头开始  右移去除shift也就占用的  左移去除高位的 一共保留64 然后是异或 都是0那就是未占用 结果0 然后&还是0 取反 符合
+                 */
+                if (!((k ? ((*p >> k) | (*(p + 1) << (64 - k))) : *p) & (num)))
                 {
                     unsigned long l;
-                    // 针对整个page_struct的偏移 应该是page = k?
-                    page = j + k - 1;
+                    page = j + k - shift; // 等于start+上k for中的移位次数 也就是开始的index
                     for (l = 0; l < number; l++)
                     {
+                        struct Page *pageptr = memory_management_struct.pages_struct + page + l;
 
-                        struct Page *x = memory_management_struct.pages_struct + page + l;
-                        page_init(x, page_flags);
+                        *(memory_management_struct.bits_map + ((pageptr->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (pageptr->PHY_address >> PAGE_2M_SHIFT) % 64;
+                        z->page_using_count++;
+                        z->page_free_count--;
+                        pageptr->attribute = attribute;
                     }
                     goto find_free_pages;
                 }
             }
         }
     }
-
+    color_printk(RED, BLACK, "alloc_pages() ERROR: no page can alloc\n");
     return NULL;
 
 find_free_pages:
@@ -129,34 +157,72 @@ find_free_pages:
     return (struct Page *)(memory_management_struct.pages_struct + page);
 }
 
+// 简化逻辑 使之更加独立
 unsigned long page_clean(struct Page *page)
 {
-    if (!page->attribute)
+
+    page->reference_count--;
+    page->zone_struct->total_pages_link--;
+
+    if (!page->reference_count)
     {
-        page->attribute = 0;
+        page->attribute &PG_PTable_Maped;
     }
-    else if ((page->attribute & PG_Referenced) || (page->attribute & PG_K_Share_To_U))
+
+    return 1;
+    // if (!page->attribute)
+    // {
+    //     page->attribute = 0;
+    // }
+    // else if ((page->attribute & PG_Referenced) || (page->attribute & PG_K_Share_To_U))
+    // {
+    //     page->reference_count--;
+    //     page->zone_struct->total_pages_link--;
+    //     if (!page->reference_count)
+    //     {
+    //         page->attribute = 0;
+    //         page->zone_struct->page_using_count--;
+    //         page->zone_struct->page_free_count++;
+    //     }
+    // }
+    // else
+    // {
+    //     *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) &= ~(1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64);
+
+    //     page->attribute = 0;
+    //     page->reference_count = 0;
+    //     page->zone_struct->page_using_count--;
+    //     page->zone_struct->page_free_count++;
+    //     page->zone_struct->total_pages_link--;
+    // }
+    // return 0;
+}
+
+unsigned long get_page_attribute(struct Page *page)
+{
+    if (page == NULL)
     {
-        page->reference_count--;
-        page->zone_struct->total_pages_link--;
-        if (!page->reference_count)
-        {
-            page->attribute = 0;
-            page->zone_struct->page_using_count--;
-            page->zone_struct->page_free_count++;
-        }
+        color_printk(RED, BLACK, "get_page_attribute() ERROR: page == NULL\n");
+        return 0;
     }
     else
     {
-        *(memory_management_struct.bits_map + ((page->PHY_address >> PAGE_2M_SHIFT) >> 6)) &= ~(1UL << (page->PHY_address >> PAGE_2M_SHIFT) % 64);
-
-        page->attribute = 0;
-        page->reference_count = 0;
-        page->zone_struct->page_using_count--;
-        page->zone_struct->page_free_count++;
-        page->zone_struct->total_pages_link--;
+        return page->attribute;
     }
-    return 0;
+}
+
+unsigned long set_page_attribute(struct Page *page, unsigned long flags)
+{
+    if (page == NULL)
+    {
+        color_printk(RED, BLACK, "set_page_attribute() ERROR: page == NULL\n");
+        return 0;
+    }
+    else
+    {
+        page->attribute = flags;
+        return 1;
+    }
 }
 
 // 获取内存信息
@@ -289,6 +355,7 @@ void init_memory()
     memory_management_struct.pages_struct->zone_struct = memory_management_struct.zones_struct;
     memory_management_struct.pages_struct->PHY_address = 0UL;
     memory_management_struct.pages_struct->attribute = 0;
+    set_page_attribute(memory_management_struct.pages_struct, PG_PTable_Maped | PG_Kernel_Init | PG_Kernel);
     memory_management_struct.pages_struct->reference_count = 0;
     memory_management_struct.pages_struct->age = 0;
 
@@ -302,15 +369,19 @@ void init_memory()
 
     ZONE_DMA_INDEX = 0;    // need rewrite in the future
     ZONE_NORMAL_INDEX = 0; // need rewrite in the future
+    ZONE_UNMAPED_INDEX = 0;
 
     for (i = 0; i < memory_management_struct.zones_size; i++) // need rewrite in the future
     {
         struct Zone *z = memory_management_struct.zones_struct + i;
         color_printk(ORANGE, BLACK, "zone_start_address:%#018lx,zone_end_address:%#018lx,zone_length:%#018lx,pages_group:%#018lx,pages_length:%#018lx\n", z->zone_start_address, z->zone_end_address, z->zone_length, z->pages_group, z->pages_length);
 
-        if (z->zone_start_address == 0x100000000)
+        //  这边我没到4G 因为还是用的bochs 只能模拟2g
+        if (z->zone_start_address == 0x100000000 && !ZONE_UNMAPED_INDEX)
             ZONE_UNMAPED_INDEX = i;
     }
+
+    color_printk(ORANGE, BLACK, "ZONE_DMA_INDEX:%d\tZONE_NORMAL_INDEX:%d\tZONE_UNMAPED_INDEX:%d\n", ZONE_DMA_INDEX, ZONE_NORMAL_INDEX, ZONE_UNMAPED_INDEX);
 
     memory_management_struct.end_of_struct = (unsigned long)((unsigned long)memory_management_struct.zones_struct + memory_management_struct.zones_length + sizeof(long) * 32) & (~(sizeof(long) - 1)); ////need a blank to separate memory_management_struct
 
@@ -321,7 +392,11 @@ void init_memory()
 
     for (j = 0; j <= i; j++)
     {
-        page_init(memory_management_struct.pages_struct + j, PG_PTable_Maped | PG_Kernel_Init | PG_Active | PG_Kernel);
+        struct Page *tmp_page = memory_management_struct.pages_struct + j;
+        page_init(tmp_page, PG_PTable_Maped | PG_Kernel_Init | PG_Kernel);
+        *(memory_management_struct.bits_map + ((tmp_page->PHY_address >> PAGE_2M_SHIFT) >> 6)) |= 1UL << (tmp_page->PHY_address >> PAGE_2M_SHIFT) % 64;
+        tmp_page->zone_struct->page_using_count++;
+        tmp_page->zone_struct->page_free_count--;
     }
 
     // 获取cr3值 这里是物理地址 保存得是页目录表地址 根据header.S 是 0x0000000000101000
@@ -333,9 +408,11 @@ void init_memory()
     color_printk(INDIGO, BLACK, "*Global_CR3\t:%#018lx\n", *Phy_To_Virt(Global_CR3) & (~0xff));
     color_printk(PURPLE, BLACK, "**Global_CR3\t:%#018lx\n", *Phy_To_Virt(*Phy_To_Virt(Global_CR3) & (~0xff)) & (~0xff));
 
-    // 这里将前10表项项清零
-    // for (i = 0; i < 10; i++)
-    //     *(Phy_To_Virt(Global_CR3) + i) = 0UL;
+    color_printk(ORANGE, BLACK, "1.memory_management_struct.bits_map:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
+
+    // 将前10页清零 也就是清除线性地址0和0xffff800000000000在页表中的重映射 但是这样task_init就无法执行了
+    for (i = 0; i < 10; i++)
+        *(Phy_To_Virt(Global_CR3) + i) = 0UL;
 
     flush_tlb();
 }
@@ -973,4 +1050,65 @@ unsigned long slab_init()
     color_printk(ORANGE, BLACK, "start_code:%#018lx,end_code:%#018lx,end_data:%#018lx,end_brk:%#018lx,end_of_struct:%#018lx\n", memory_management_struct.start_code, memory_management_struct.end_code, memory_management_struct.end_data, memory_management_struct.end_brk, memory_management_struct.end_of_struct);
 
     return 1;
+}
+
+void pagetable_init()
+{
+    unsigned long i, j;
+    unsigned long *tmp = NULL;
+
+    Global_CR3 = Get_gdt();
+
+    // 屏蔽cr3中的标志位 然后偏移256个项(就是这个0xffff800000000000开始的 3级页表位置) 在转换为线性地址
+    tmp = (unsigned long *)(((unsigned long)Phy_To_Virt((unsigned long)Global_CR3 & (~0xfffUL))) + 8 * 256);
+
+    color_printk(YELLOW, BLACK, "1:%#018lx,%#018lx\t\t\n", (unsigned long)tmp, *tmp);
+
+    // 获得2j页表的线性地址
+    tmp = Phy_To_Virt(*tmp & (~0xfffUL));
+
+    color_printk(YELLOW, BLACK, "2:%#018lx,%#018lx\t\t\n", (unsigned long)tmp, *tmp);
+
+    // 获得pt的线性地址
+    tmp = Phy_To_Virt(*tmp & (~0xfffUL));
+
+    color_printk(YELLOW, BLACK, "3:%#018lx,%#018lx\t\t\n", (unsigned long)tmp, *tmp);
+
+    for (i = 0; i < memory_management_struct.zones_size; i++)
+    {
+        struct Zone *z = memory_management_struct.zones_struct + i;
+        struct Page *p = z->pages_group;
+
+        if (ZONE_UNMAPED_INDEX && i == ZONE_UNMAPED_INDEX)
+            break;
+
+        for (j = 0; j < z->pages_length; j++, p++)
+        {
+
+            tmp = (unsigned long *)(((unsigned long)Phy_To_Virt((unsigned long)Global_CR3 & (~0xfffUL))) + (((unsigned long)Phy_To_Virt(p->PHY_address) >> PAGE_GDT_SHIFT) & 0x1ff) * 8);
+
+            if (*tmp == 0)
+            {
+                unsigned long *virtual = kmalloc(PAGE_4K_SIZE, 0);
+                set_mpl4t(tmp, mk_mpl4t(Virt_To_Phy(virtual), PAGE_KERNEL_GDT));
+            }
+
+            tmp = (unsigned long *)((unsigned long)Phy_To_Virt(*tmp & (~0xfffUL)) + (((unsigned long)Phy_To_Virt(p->PHY_address) >> PAGE_1G_SHIFT) & 0x1ff) * 8);
+
+            if (*tmp == 0)
+            {
+                unsigned long *virtual = kmalloc(PAGE_4K_SIZE, 0);
+                set_pdpt(tmp, mk_pdpt(Virt_To_Phy(virtual), PAGE_KERNEL_Dir));
+            }
+
+            tmp = (unsigned long *)((unsigned long)Phy_To_Virt(*tmp & (~0xfffUL)) + (((unsigned long)Phy_To_Virt(p->PHY_address) >> PAGE_2M_SHIFT) & 0x1ff) * 8);
+
+            set_pdt(tmp, mk_pdt(p->PHY_address, PAGE_KERNEL_Page));
+
+            if (j % 50 == 0)
+                color_printk(GREEN, BLACK, "@:%#018lx,%#018lx\t\n", (unsigned long)tmp, *tmp);
+        }
+    }
+
+    flush_tlb();
 }

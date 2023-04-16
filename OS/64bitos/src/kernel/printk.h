@@ -53,15 +53,8 @@ struct position
 	unsigned long FB_length;
 } Pos;
 
-/*
-
-*/
-
+void frame_buffer_init();
 void putchar(unsigned int *fb, int Xsize, int x, int y, unsigned int FRcolor, unsigned int BKcolor, unsigned char font);
-
-/*
-
-*/
 
 int skip_atoi(const char **s);
 
