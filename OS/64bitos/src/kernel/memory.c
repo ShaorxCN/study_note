@@ -410,7 +410,8 @@ void init_memory()
 
     color_printk(ORANGE, BLACK, "1.memory_management_struct.bits_map:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
 
-    // 将前10页清零 也就是清除线性地址0和0xffff800000000000在页表中的重映射 但是这样task_init就无法执行了
+    // 将前10页清零 也就是清除线性地址0和0xffff800000000000在页表中的重映射(只保留 0xffff800000000000) 但是这样task_init就无法执行了
+    // 设计只需需要清1个 header.S中只有index 0 和 256 设置了
     for (i = 0; i < 10; i++)
         *(Phy_To_Virt(Global_CR3) + i) = 0UL;
 
@@ -1059,40 +1060,44 @@ void pagetable_init()
 
     Global_CR3 = Get_gdt();
 
-    // 屏蔽cr3中的标志位 然后偏移256个项(就是这个0xffff800000000000开始的 3级页表位置) 在转换为线性地址
+    // 屏蔽cr3中的标志位 然后偏移256个项(就是这个0xffff800000000000开始的 4级页表位置) 在转换为线性地址
     tmp = (unsigned long *)(((unsigned long)Phy_To_Virt((unsigned long)Global_CR3 & (~0xfffUL))) + 8 * 256);
-
+    // 0xffff800000101800=lds的 0xffff800000000000 + 0x100000+org的1000+256个表项的8byte(800)然后值102023 这个多的2是属性accessed 这边是访问了 所以多了这个标志位 bit[5]
     color_printk(YELLOW, BLACK, "1:%#018lx,%#018lx\t\t\n", (unsigned long)tmp, *tmp);
 
-    // 获得2j页表的线性地址
+    // 获得3j页表的线性地址
     tmp = Phy_To_Virt(*tmp & (~0xfffUL));
-
+    // 0xffff800000102000   0x103023
     color_printk(YELLOW, BLACK, "2:%#018lx,%#018lx\t\t\n", (unsigned long)tmp, *tmp);
 
-    // 获得pt的线性地址
+    // 获得pde的线性地址
     tmp = Phy_To_Virt(*tmp & (~0xfffUL));
-
+    //  0xffff800000103000  00000000e3 设置的值是00000083 同理bit[5]=1 然后bit[6]avalibale =1 bit 还有原本的设置bit[7]PS=1 表示2M
     color_printk(YELLOW, BLACK, "3:%#018lx,%#018lx\t\t\n", (unsigned long)tmp, *tmp);
 
+    // 将4G以内的重新映射
     for (i = 0; i < memory_management_struct.zones_size; i++)
     {
         struct Zone *z = memory_management_struct.zones_struct + i;
         struct Page *p = z->pages_group;
 
+        // 这边不会进 模拟器还是2G init_memory中的逻辑未生效
         if (ZONE_UNMAPED_INDEX && i == ZONE_UNMAPED_INDEX)
             break;
 
         for (j = 0; j < z->pages_length; j++, p++)
         {
-
+            // l4的线性地址 加上 线性地址中的lv4index*8 也就是offset 得出对应的l4表项地址
             tmp = (unsigned long *)(((unsigned long)Phy_To_Virt((unsigned long)Global_CR3 & (~0xfffUL))) + (((unsigned long)Phy_To_Virt(p->PHY_address) >> PAGE_GDT_SHIFT) & 0x1ff) * 8);
 
+            // 如果是0则说明未映射l3页表  则申请一个4kpage 做存储次级页表使用 然后设置
             if (*tmp == 0)
             {
                 unsigned long *virtual = kmalloc(PAGE_4K_SIZE, 0);
                 set_mpl4t(tmp, mk_mpl4t(Virt_To_Phy(virtual), PAGE_KERNEL_GDT));
             }
 
+            // 同理检查l3的index 没有则继续申请并设置
             tmp = (unsigned long *)((unsigned long)Phy_To_Virt(*tmp & (~0xfffUL)) + (((unsigned long)Phy_To_Virt(p->PHY_address) >> PAGE_1G_SHIFT) & 0x1ff) * 8);
 
             if (*tmp == 0)
@@ -1101,6 +1106,7 @@ void pagetable_init()
                 set_pdpt(tmp, mk_pdpt(Virt_To_Phy(virtual), PAGE_KERNEL_Dir));
             }
 
+            // 最后就是l2的线性地址 借助线性地址设置 这里是2M page这里就结束 设置pde的物理地址
             tmp = (unsigned long *)((unsigned long)Phy_To_Virt(*tmp & (~0xfffUL)) + (((unsigned long)Phy_To_Virt(p->PHY_address) >> PAGE_2M_SHIFT) & 0x1ff) * 8);
 
             set_pdt(tmp, mk_pdt(p->PHY_address, PAGE_KERNEL_Page));

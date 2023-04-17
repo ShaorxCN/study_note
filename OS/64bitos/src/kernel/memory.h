@@ -4,12 +4,13 @@
 #include "printk.h"
 #include "lib.h"
 
-//	8Bytes per cell
+//	8Bytes per cell 表项个数
 #define PTRS_PER_PAGE 512
 
-// 初始线性地址
+// 初始线性地址 内核层 物理0
 #define PAGE_OFFSET ((unsigned long)0xffff800000000000)
 
+// 16+9+9+9+9+12  右移获取4j中的index
 #define PAGE_GDT_SHIFT 39
 // 大中小分页的size 容量
 #define PAGE_1G_SHIFT 30

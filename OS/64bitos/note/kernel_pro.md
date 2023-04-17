@@ -63,6 +63,15 @@ struct Slab_cache和struct Slab两个结构体。结构体struct Slab_cache用�
 然后是物理页管理功能的调整。
 现在，内存管理单元已实现内存页的申请和释放、通用内存的分配和回收、SLAB内存池等功能。但页表却仅有区区24个物理页（48 MB物理内存）完成了页面映射，剩余物理内存除非完成页面映射，否则无法直接使用。这就导致ZONE_NORMAL_INDEX区域只能分配出有限的几个内存页。页表的重新初始化过程会对内核页表重新赋值，并为其创建子页表，直至将0~4 GB内的物理页映射到线性地址空间。
 
+这边再附加一个64bit 四级分页的bit说明 来自[osdev](https://wiki.osdev.org/File:64-bit_page_tables1.png)
+
+<img src="./img/64ptbit说明.png">
+
+下面是1G 2M 4k末级的 这边注意PSbit
+
+<img src="./img/64bit_2M_PDE.png">
+
+
 
 
 

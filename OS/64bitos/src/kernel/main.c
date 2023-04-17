@@ -34,7 +34,7 @@ void Start_Kernel(void)
 	Pos.XCharSize = 8;
 	Pos.YCharSize = 16;
 
-	// 内存管理扩充后 vbe帧缓存区起始线性地址变化 实际物理地址 0xA0000
+	// 内存管理扩充后 vbe帧缓存区起始线性地址变化 实际物理地址 0xA0000 这个根据查询获得 按照实际值设置
 	// Pos.FB_addr = (int *)0xffff800000a00000;
 	Pos.FB_addr = (int *)0xffff800003000000;
 	Pos.FB_length = (Pos.XResolution * Pos.YResolution * 4 + PAGE_4K_SIZE - 1) & PAGE_4K_MASK;

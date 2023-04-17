@@ -14,6 +14,7 @@ void frame_buffer_init()
 
 	Global_CR3 = Get_gdt();
 
+	// l4线性地址 看是否映射 没有则申请并设置 下面同理一直到pde
 	tmp = Phy_To_Virt((unsigned long *)((unsigned long)Global_CR3 & (~0xfffUL)) + (((unsigned long)FB_addr >> PAGE_GDT_SHIFT) & 0x1ff));
 	if (*tmp == 0)
 	{
