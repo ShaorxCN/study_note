@@ -3,6 +3,7 @@
 包含内容
 -  [1 部分概念说明](#c1)
 -  [2 SLAB内存池](#c2)
+-  [3 APIC](#c3)
 
 <div id=c1><h2>部分概念说明</h2></div>
 
@@ -70,6 +71,212 @@ struct Slab_cache和struct Slab两个结构体。结构体struct Slab_cache用�
 下面是1G 2M 4k末级的 这边注意PSbit
 
 <img src="./img/64bit_2M_PDE.png">
+
+
+<div id=c3><h2>APIC</h2></div>
+
+之前8259A PIC部分。因为是 通过主次芯片组然后将中断信号传递给指定处理器。但是在多核环境下这种处理方式会降低效率。APIC放弃INTR引脚的方式 改成总线方式。将中断控制器分为两个部分：处理器内部的Local APIC和位于主板芯片组的I/O APIC。这两个控制器模块通过总线相连。结构关系如下图:
+
+
+<img src="./img/APIC_struct.png">
+
+如图:每个核心都拥有自己的local APIC.而芯片组上通常只有一个IO APIC。(高级平台可能有多个)
+
+- **Local APIC**:它既可接收来自处理器核心的中断请求，亦可接收内部中断源和外部I/O APIC的中断请求。随后，再将这些请求发送至处理器核心中进行处理。</br>Local APIC还可通过总线实现双向收发**IPI**（Inter-Processor Interrupt，处理器间中断）消息，IPI消息可收发自目标处理器的逻辑核心。IPI消息主要应用于多核处理器环境下，通过它可实现各处理器核心间的通信，这也是多核处理器之间使用的主要通信手段。
+- **I/O APIC**:外部I/O APIC是主板芯片组的一部分。它主要负责接收外部I/O设备发送来的中断请求，并将这些中断请求封装成中断消息投递至目标Local APIC。
+
+
+在多核处理器环境下，I/O APIC能够提供一种机制来分发外部中断请求（中断消息）至目标处理器的Local APIC控制器中，或者分发到系统总线上的处理器组中。
+
+
+在处理器的每个核心中，都拥有一个Local APIC，它不但可接收I/O APIC发送来的中断请求，还可接收其他处理器核心发送来的IPI中断请求，甚至可以向其他处理器核心发送IPI中断请求。
+
+### Local APIC
+
+local APIC采用内存访问方式（寄存器映射到物理地址空间)来操作寄存器。之前的8259A则是IO端口的形式。内存访问方式则更快。也有支持直接访问寄存器的local APIC.
+
+主要是负责接受中断请求或者中断消息 然后提交给处理器核心
+
+下面是local APIC寄存器的相关知识。
+
+下图是寄存器组的版本寄存器。
+
+<img src="./img/local_apic_ver.png">
+
+下图是版本寄存器的位功能图:
+
+<img src="./img/local_apic_ver_bit.png">
+
+Local APIC大体可分为内置和外置两个版本，可通过版本ID加以区分，表10-2描述了详细的版本ID。如果Local APIC支持EOI消息的禁止广播功能，那么通过SVR寄存器的相关位可控制EOI消息禁止广播功能的开启与关闭。
+
+<img src="./img/local_apic_ver_diff.png">
+
+APIC架构里的一些特性在xAPIC中得到了扩展和修改。在xAPIC中，基础操作模式为xAPIC模式。高级的x2APIC模式在xAPIC模式的基础上进一步扩展，其引入了处理器对Local APIC寄存器的寻址功能，即将Local APIC的寄存器地址映射到MSR寄存器组中，从而可直接使用RDMSR和WRMSR指令来访问Local APIC寄存器。
+
+下图是一个apic和xapic的IA32_APIC_BASE的寄存器说明(位于MSR寄存器组):
+
+<img src="./img/apic_base_reg.png">
+
+下面是位说明（maxphyaddr 可以通过cpuid来查询 指的是处理器支持的最大物理地址 个人计算机一般36也就是 64g）
+
+
+<img src="./img/apic_base_bit.png">
+
+当硬件上电或重启后，硬件平台会自动选择一个处理器作为引导处理器，并置位IA32_APIC_BASE寄存器的BSP标志位，而未置位处理器将作为应用处理器使用。xAPIC全局使能标志位可用于控制APIC和xAPIC模式的开启与关闭，置位表示开启，复位表示关闭。APIC寄存器组的物理基地址区域用于为处理器提供访问APIC寄存器组的起始物理地址（按4 KB边界对齐），MAXPHYADDR的可选值有36/40/52，在系统上电或重启后，APIC寄存器组的默认物理基地址为FEE00000h。
+当CPUID.01h:ECX[21]=1时，说明处理器支持x2APIC模式。对于支持x2APIC模式的处理器来说，其IA32_APIC_BASE寄存器新增了x2APIC模式的使能标志位
+
+下图是x2apic的base寄存器结构:
+
+<img src="./img/xapic_base.png">
+
+这边就是bit[10]EXTD和bit[11]EN做组合使能。在开启xAPIC的基础上(EN置位)再EXTD置位则开启x2APIC.如果仅仅EN则是xapic。当然EN=0 EXTD=1是无效的。
+
+在模式确认的情况下，置位伪中断向量寄存器SVR(见下面)的bit[8]才是完全开启local apic控制器。
+
+这边总结下 xapic支持的内存映射控制寄存器。x2apic则是支持MSR寄存器组映射控制。下图是两种模式的映射说明:
+
+<img src="./img/xapic_x2apic_map.png">
+
+#### local APIC ID寄存器
+
+当物理平台上电后，硬件设备会为系统总线上的每一个Local APIC分配唯一的初始APIC ID值，并将其保存在APIC ID寄存器内。硬件指派初始APIC ID值的原则是基于系统拓扑结构（包括封装位置和簇信息）构建的，通过CPUID.01h:EBX[31:24]可获得这个8位的初始APIC ID值。
+在多核处理器系统中，BIOS和操作系统会将Local APIC ID值作为处理器核心的ID号。某些处理器甚至允许软件修改Local APIC ID值。各版本Local APIC的Local APIC ID寄存器位功能各不相同。
+
+下图各版本的apic id寄存器位图：
+
+<img src="./img/local_apic_id.png">
+
+借助CPUID.01h:ECX[21]可检测出32/64位处理器是否支持x2APIC模式，置位时表示处理器支持x2APIC模式。此时，如果CPUID支持0Bh功能，那么处理器通过CPUID.0Bh:EDX可获取32位的x2APIC ID值，此值与MSR寄存器组802H地址处的x2APIC ID值相同。
+
+在xAPIC和x2APIC模式下，CPUID.0Bh:EDX返回的是一个32位的Local APIC ID值。对于不支持x2APIC模式的硬件平台，CPUID.0Bh:EDX返回的32位数值仅低8位有效。在通常情况下，CPUID.0BH:EDX[7:0]的数值与初始APIC ID值相等.
+
+下图是local apic寄存器组整体描述
+
+<img src="./img/local_apic_regs.png">
+
+如图大概六类中断源:
+
+1. 内部I/O设备:IO设备将边沿或电平中断信号直接发到处理器的中断引脚(LINT0和LINT1) 也可以先连接到类8259a控制器，再通过8259a转发中断请求到处理器的中断引脚
+2. 外部IO设备:请求直接发送到I/O APIC的输入引脚。IO APIC封装成中断消息 再将其投递到系统的一个或多个处理器核心。
+3. IPI消息:Intel 32/64处理器可通过IPI机制中断总线上的其他处理器或者处理器组。软件可借助IPI消息中断自身，转发中断以及抢占调度等
+4. 定时器中断:到达预定时间后，向local apic发送一个中断请求信号。随后由local apic将中断请求转发到处理器
+5. 性能监控中断:类似定时器中断  再性能监测计数器溢出后向local apic发送中断请求信号 再转发到处理器
+6. 温度传感器中断：类似性能监控中断,内部温度传感器到达阈值后 向local apic发送中断请求信号。然后转发到处理器
+7. 内部错误中断:监测到运行错误 向local apic发送中断请求信号。然后转发到处理器
+   
+
+
+#### LVT local vector table 本地中断向量表
+
+
+用途与8259A芯片的中断号相似，只不过8259A接收的是外部I/O设备发送来的中断请求，而LVT接收的则是处理器内部产生的中断请求。高级中断控制器会对中断源产生的中断请求进行详细配置，比如自定义中断向量号、中断投递方式、中断触发方式以及中断触发电平等信息，这些配置项可使中断处理过程更加灵活。
+
+如上面图所示 lvt中还有5个寄存器(下面是6个 多个cmci corrected  machine-check-error-interrupt 这个看是否支持)。其中各个位图如下：
+
+<img src="./img/lvt_reg.png">
+
+这6个寄存器对应的场景如下图:
+
+<img src="./img/lvt_regs_solution.png">
+
+他们的初始值都是00010000h 可以参考位图所示：表示 中断向量号为0 空闲 投递模式是fixed 触发模式 边沿触发。屏蔽标志位是1 已经屏蔽。
+
+下面是bit位说明 图里的屏蔽标志位说明有问题 反了
+
+<img src="./img/local_apic_reg_bit.png">
+
+在Local APIC处理性能监控计数器的中断请求时，Local APIC会自动置位性能监控计数器寄存器的屏蔽标志位。
+
+在APIC体系结构中，只允许有一个ExtINT投递模式的信号源存在，也就是说整个系统只能有一个处理器核心使用类8259A中断控制器，通常情况下此模式还需要兼容型桥芯片的支持。
+
+下面是几种投递方式 简单讲就是LVT的向量号是fixed投递。然后除了ExtINT是忽视或者需要向量号为0.ExtINT就是兼容8259a的 ，多核下只有一个核心能使用类似8259a控制器。
+这边投递状态0 空闲 表示目前中断源未产生中断或者说产生的中断已经投递到处理器并被处理器处理。1 挂起代表已经将中断请求 投递到处理器 但是未被受理。
+
+
+触发模式只在Fixed投递模式下有效；NMI、SMI或INIT等投递模式始终采用边沿触发模式，ExtINT投递模式使用电平触发模式。而LVT定时器寄存器和错误寄存器的中断源始终使用边沿触发模式。如果Local APIC控制器没有结合I/O APIC控制器使用，并设置为Fixed投递模式，那么Pentium 4、Xeon和P6家族的处理器将始终采用电平触发模式。由于LINT1引脚不支持电平触发模式，所以软件应始终将LINT1寄存器设置边沿触发模式。
+(电平触发:触发信号为有效电平（高或低）时，输入信号进入触发器电路，置触发器为相应状态。触发信号变为无效电平后，输入信号被封锁，触发器状态保持。
+ 边沿触发:边沿触发指的是接收时钟脉冲CLK 的某一约定跳变(正跳变或负跳变)来到时的输入数据。在CLK=l 及CLK=0 期间以及CLK非约定跳变到来时，触发器不接收数据的触发器。
+)
+
+下图是local_apic timer的模式类别
+
+<img src="./img/local_apic_timer_mode.png">
+
+#### ESR寄存器
+
+Local APIC能够监测出收发中断消息时出现的错误。一旦Local APIC监测到有错误发生，便会通过LVT的错误寄存器向处理器投递中断消息，再将错误内容记录在ESR（Error Status Register，错误状态寄存器）内
+
+<img src="./img/esr_bit.png">
+
+<img src="./img/esr_dsc.png">
+
+ESR是可读写寄存器，处理器在读取ESR的数值前，必须先向其中写入一个数值。写入的数值不会影响后续的读取操作，通常情况下应该写入数值0。
+
+#### TPR(task priority register 任务优先级寄存器) PPR(processor priority register  处理器优先级寄存器) CR8寄存器
+
+中断向量号是一个8位的数值，它可进一步拆分为高4位和低4位两部分，高4位是中断优先权等级，而低4位则是中断优先权的子等级。
+
+中断优先权等级（Interrupt-Priority Class）是中断向量号的高4位，数值1是其最低优先权等级，15是其最高优先权等级。中断向量号0~31已被处理器保留使用，那么软件可配置的中断优先权等级的有效范围是2~15。每个中断优先权等级包含16个向量号，分别对应着中断向量号的低4位，其数值越大优先权越高。
+
+TPR 和 PPR可以补充额外的中断请求优先级
+
+TPR的bit[7:4]任务优先级等级 bit[3:0]任务优先级子等级。
+只处理比设置高的 。比他低的则继续在IRR中等待？
+
+<img src="./img/TPR_bit.png">
+
+
+PPR(只读) 则是针对处理器核心的和TPR一起控制可被中断的优先权等级。只响应比设置高的中断请求(针对fixed投递模式)位图和TPR一致
+
+PPR的值是由TPR和ISRV相比较得出的(取高值)。ISRV是ISR寄存器中目前的最高中断优先权等级 如果ISRV=00h则代表当前没有中断请求。这边相当于TPR间接控制PPR.这样能保证只有比设置或者处理中高的才能进来中断。否则继续在IRR中等待分发。
+
+
+#### cr8控制寄存器
+
+64bit 仅仅低4为有效其他必须是0.通过mov cr8来设置TPR的[7:4].需要在r0下执行。这边操作cr0的写则是间接写到tpr(只设置7:4 3:0置零)读取cr8则是执行从tpr load bit[7:4]到cr8其他位置零
+
+#### IRR ISR TMR  EOI SVR
+
+IRR ISR TMR仅fixed投递模式下说明(其他模式是直接传递到处理器核心 不经过isr irr):
+
+IRR(Interrupt Request Register)
+中断请求寄存器，256 位，每位代表着一个中断。当某个中断消息发来时，如果该中断没有被屏蔽，则将 IRR 对应的 bit 置 1，表示收到了该中断请求但 CPU 还未处理。
+
+ISR(In Service Register)
+服务中寄存器，256 位，每位代表着一个中断。当 IRR 中某个中断请求发送个 CPU 时，ISR 对应的 bit 上便置 1，表示 CPU 正在处理该中断。
+
+IRR寄存器用于记录已被处理器接收，但尚未处理的中断消息。当Local APIC接收到中断消息时，它会置位中断向量号对应的IRR寄存器位。当处理器核心准备处理下一个中断消息时，Local APIC会复位IRR寄存器里的最高中断优先权请求位（从已被置位项中选择），并置位其对应的ISR寄存器位。随后，处理器将执行ISR寄存器里的最高中断优先权请求。伴随着中断请求处理结束，Local APIC将复位中断向量号对应的ISR寄存器位，并准备处理下一个中断请求。
+
+两个都是只读。0~15bit保留
+
+TMR（Trigger Mode Register，触发模式寄存器），该寄存器用于记录每个中断请求的触发模式。当中断向量号对应的TMR寄存器位被置位时，表明中断请求采用电平触发模式，否则说明采用边沿触发模式。对于采用电平触发模式的中断请求，如果关闭禁止广播EOI消息，那么EOI消息将广播到所有I/O APIC中
+
+
+EOI(End of Interrupt)
+中断结束寄存器，32 位，写 EOI 表示中断处理完成。写 EOI 寄存器会导致 LAPIC 清理 ISR 的对应 bit，对于 level 触发的中断，还会向所有的 IOAPIC 发送 EOI 消息，通告中断处理已经完成。
+
+除了NMI、SMI、INIT、ExtINT和Start-Up等中断投递模式外，其他中断投递模式都必须在中断处理过程里明确包含写入EOI（End-Of_Interrupt，中断结束寄存器）的代码。这段代码必须在中断处理过程返回前执行，通常情况下是在执行IRET指令前。此举意味着当前中断处理过程已执行完毕，Local APIC可处理下一个中断请求（从ISR寄存器中取得）
+当Local APIC收到EOI消息后，它将复位ISR寄存器的最高位，而后再派送下一个最高中断优先权的中断请求到处理器核心。在关闭禁止广播EOI消息的前提下，如果中断请求采用电平触发模式，那么Local APIC会在收到EOI消息后，将其广播到所有I/O APIC中
+
+
+SVR(Spurious Interrupt Vector Register)
+伪中断向量寄存器。
+
+如果处理器在应答Local APIC的中断请求期间，提高了中断优先权（大于或等于当前优先权），此举迫使Local APIC屏蔽当前中断请求，那么Local APIC只能被迫向处理器投递一个伪中断请求。伪中断请求不会置位ISR寄存器，所以伪中断请求的处理程序无需发送EOI消息。
+
+<img src="./img/svr_reg.png">
+
+<img src="./img/svr_bit.png">
+
+
+
+
+
+
+
+
+
+
 
 
 

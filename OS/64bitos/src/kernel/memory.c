@@ -1111,6 +1111,7 @@ void pagetable_init()
 
             set_pdt(tmp, mk_pdt(p->PHY_address, PAGE_KERNEL_Page));
 
+            // 每50page 输出检查 也就是i物理地址相差100M  0x6400000 线性地址同表相差8*50=400B 0x190
             if (j % 50 == 0)
                 color_printk(GREEN, BLACK, "@:%#018lx,%#018lx\t\n", (unsigned long)tmp, *tmp);
         }
