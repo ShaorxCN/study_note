@@ -91,6 +91,9 @@ struct Slab_cache和struct Slab两个结构体。结构体struct Slab_cache用�
 
 在处理器的每个核心中，都拥有一个Local APIC，它不但可接收I/O APIC发送来的中断请求，还可接收其他处理器核心发送来的IPI中断请求，甚至可以向其他处理器核心发送IPI中断请求。
 
+**cpuid eax = 01h的情况下 从EDX的第九位获取是否支持apic ;ebx的高8bit 获取local apic ID**
+
+
 ### Local APIC
 
 local APIC采用内存访问方式（寄存器映射到物理地址空间)来操作寄存器。之前的8259A则是IO端口的形式。内存访问方式则更快。也有支持直接访问寄存器的local APIC.
@@ -113,7 +116,7 @@ Local APIC大体可分为内置和外置两个版本，可通过版本ID加以�
 
 APIC架构里的一些特性在xAPIC中得到了扩展和修改。在xAPIC中，基础操作模式为xAPIC模式。高级的x2APIC模式在xAPIC模式的基础上进一步扩展，其引入了处理器对Local APIC寄存器的寻址功能，即将Local APIC的寄存器地址映射到MSR寄存器组中，从而可直接使用RDMSR和WRMSR指令来访问Local APIC寄存器。
 
-下图是一个apic和xapic的IA32_APIC_BASE的寄存器说明(位于MSR寄存器组):
+下图是一个apic和xapic的IA32_APIC_BASE的寄存器说明(位于MSR寄存器组 0x1b):
 
 <img src="./img/apic_base_reg.png">
 
@@ -123,7 +126,7 @@ APIC架构里的一些特性在xAPIC中得到了扩展和修改。在xAPIC中，
 <img src="./img/apic_base_bit.png">
 
 当硬件上电或重启后，硬件平台会自动选择一个处理器作为引导处理器，并置位IA32_APIC_BASE寄存器的BSP标志位，而未置位处理器将作为应用处理器使用。xAPIC全局使能标志位可用于控制APIC和xAPIC模式的开启与关闭，置位表示开启，复位表示关闭。APIC寄存器组的物理基地址区域用于为处理器提供访问APIC寄存器组的起始物理地址（按4 KB边界对齐），MAXPHYADDR的可选值有36/40/52，在系统上电或重启后，APIC寄存器组的默认物理基地址为FEE00000h。
-当CPUID.01h:ECX[21]=1时，说明处理器支持x2APIC模式。对于支持x2APIC模式的处理器来说，其IA32_APIC_BASE寄存器新增了x2APIC模式的使能标志位
+当**CPUID.01h:ECX[21]=1时，说明处理器支持x2APIC模式**。对于支持x2APIC模式的处理器来说，其IA32_APIC_BASE寄存器新增了x2APIC模式的使能标志位
 
 下图是x2apic的base寄存器结构:
 
@@ -261,7 +264,7 @@ EOI(End of Interrupt)
 
 SVR(Spurious Interrupt Vector Register)
 伪中断向量寄存器。
-
+msr 0x80f
 如果处理器在应答Local APIC的中断请求期间，提高了中断优先权（大于或等于当前优先权），此举迫使Local APIC屏蔽当前中断请求，那么Local APIC只能被迫向处理器投递一个伪中断请求。伪中断请求不会置位ISR寄存器，所以伪中断请求的处理程序无需发送EOI消息。
 
 <img src="./img/svr_reg.png">
@@ -336,8 +339,13 @@ I/O APIC作为中断请求的中转芯片，不停地将外部I/O设备发送来
 
 
 1. **PIC中断模式**: 避开apic 直接使系统运行于单处理器模式.PIC中断模式采用类8259A中断控制器来投递中断请求。在该模式下，中断请求只能投递至BSP处理器核心，整个中断投递过程不会有Local APIC和I/O APIC参与.通过IMCR(interrupt mode configuration register)寄存器。使pic模式下的硬件绕过IO apuc.直接发送到处理器：</br><img src="./img/pic_mode.png"></br>图中的虚线部分是实际的。imcr寄存器控制bsp处理器接受中断请求的链路,也就是选择接收类8259a的中断请求或者是接收local apic的中断请求。imcr是一个间接访问寄存器。通过io端口的22h写入imcr的地址(地址70h)。在向io端口的23h写入imcr的数值来操作。系统上电默认imcr 00h 就是中断模式。nmi和类8259a的引脚将直接连接到bsp处理器。如果imcr写入01h 可强制价格nmi和类8259a的中断请求发送到apic(local apic或者 io apic) 也就是说中断模式是兼容之前的
-2. **Virtual Wire中断模式**: Virtual Wire中断模式是基于APIC设备的单处理器模式，它为所有DOS软件的启动和运行提供了硬件环境。Virtual Wire中断模式包含两种子模式，一种是基于Local APIC的Virtual Wire中断模式，另一种是基于I/O APIC的Virtual Wire中断模式。这两种中断模式，都将中断请求从类8259A投递至Local APIC中，而不同点在于投递的线路上是否会经过I/O APIC。
+2. **Virtual Wire中断模式**: Virtual Wire中断模式是基于APIC设备的单处理器模式，它为所有DOS软件的启动和运行提供了硬件环境。Virtual Wire中断模式包含两种子模式，一种是基于Local APIC的Virtual Wire中断模式，另一种是基于I/O APIC的Virtual Wire中断模式。这两种中断模式，都将中断请求从类8259A投递至Local APIC中，而不同点在于投递的线路上是否会经过I/O APIC。基于local apic的模式：local apic 的lintin0引脚配置为extint投递模式，将8259a pic作为外部中断控制器。中断向量号由类8259a提供。而基于io apic的virtual wire中断模式中，中断请求由8259a收集  统一穿过io apic再投递到bsp处理器的local apic.这个模式下 io apic的引脚0 连接着8259a的主芯片。RTE0寄存器设置为extint投递模式。
+3. **Symmetric I/O中断模式**: Symmetric I/O中断模式应用于多核处理器操作系统中，这个中断模式至少需要一个I/O APIC。如果操作系统准备使用Symmetric I/O中断模式，首先要将类8259A中断控制器屏蔽，使得类8259A的中断请求引脚改由I/O APIC接管。其结构如图:<img src="./img/symmetric.png"></br>可以向IMCR寄存器写入数值01h来屏蔽类8259A，亦可通过类8259A的IMR寄存器达到屏蔽目的，甚至还可以通过屏蔽LVT的LINT0寄存器来实现。
 
+
+#### local apic 初始化
+
+这边将中断控制器的配置和管理拆分到8259A.c和APIC.c.interrupt.c则是中断处理机制的实现。
 
 
 
