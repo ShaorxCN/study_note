@@ -196,12 +196,11 @@ void Start_Kernel(void)
 	color_printk(ORANGE, BLACK, "7.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *(memory_management_struct.bits_map + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), *(memory_management_struct.bits_map + 1 + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_using_count, (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_free_count);
 
 	color_printk(RED, BLACK, "interrupt init \n");
-	init_interrupt();
-	#if APIC
-		APIC_IOAPIC_init();
-	#else
-		init_8259A();
-	#endif
+#if APIC
+	APIC_IOAPIC_init();
+#else
+	init_8259A();
+#endif
 	// color_printk(RED, BLACK, "task_init \n");
 	// task_init();
 	while (1)

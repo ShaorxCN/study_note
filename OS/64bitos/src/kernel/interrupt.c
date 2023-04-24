@@ -36,7 +36,6 @@
     "movq	%rdx,	%ds;	\n\t"   \
     "movq	%rdx,	%es;	\n\t"
 
-
 /*
     上面## 用于连接两个宏值。宏展开的时候它会将操作符两边的内容连接起来。 #则是吧后面的内容当作字符串
     比如Build_IRQ(0x20) 展开=> void IRQ_NAME(0x20)=>void IRQ_NAME2(IRQ##0x20）=> void IRQ0x20_interrupt(void)
@@ -68,7 +67,6 @@
 /*
 
 */
-
 Build_IRQ(0x20)
 Build_IRQ(0x21)
 Build_IRQ(0x22)
@@ -122,48 +120,45 @@ void (*interrupt[24])(void) =
         IRQ0x35_interrupt,
         IRQ0x36_interrupt,
         IRQ0x37_interrupt,
+
 };
 
-
-// 默认硬件
-void init_interrupt()
+// 注册中断
+int register_irq(unsigned long irq,
+                 void *arg,
+                 void (*handler)(unsigned long nr, unsigned long parameter, struct pt_regs *regs),
+                 unsigned long parameter,
+                 hw_int_controller *controller,
+                 char *irq_name)
 {
-    int i;
-    for (i = 32; i < 56; i++)
-    {
-        set_intr_gate(i, 2, interrupt[i - 32]);
-    }
+    // 这边定义的中断时32-55
+    irq_desc_T *p = &interrupt_desc[irq - 32];
 
-    color_printk(RED, BLACK, "8259A init \n");
+    p->controller = controller;
+    p->irq_name = irq_name;
+    p->parameter = parameter;
+    p->flags = 0;
+    p->handler = handler;
 
-    //8259A-master	ICW1-4
-	io_out8(0x20,0x11);
-	io_out8(0x21,0x20);
-	io_out8(0x21,0x04);
-	io_out8(0x21,0x01);
+    // 安装并且使能该中断
+    p->controller->install(irq, arg);
+    p->controller->enable(irq);
 
-	//8259A-slave	ICW1-4
-	io_out8(0xa0,0x11);
-	io_out8(0xa1,0x28);
-	io_out8(0xa1,0x02);
-	io_out8(0xa1,0x01);
-
-	//8259A-M/S	OCW1
-	io_out8(0x21,0xfd);  // 屏蔽除了IRQ1 也就是键盘之外的中断请求
-	io_out8(0xa1,0xff);
-
-	sti();
+    return 1;
 }
 
-/*
-    通过rdi rsi寄存器传送参数  rsp和中断号
-    统一入口
-*/
-void do_IRQ(unsigned long regs,unsigned long nr)	//regs:rsp,nr
+// 注销中断
+int unregister_irq(unsigned long irq)
 {
-    unsigned char x;
-	color_printk(RED,BLACK,"do_IRQ:%#08x\t",nr);
-	x = io_in8(0x60);  // 键盘芯片的读写缓冲区 这里读取其中的按键扫描码
-	color_printk(RED,BLACK,"key code:%#08x\n",x);
-	io_out8(0x20,0x20);  // 发送EOI
+    irq_desc_T *p = &interrupt_desc[irq - 32];
+    p->controller->disable(irq);
+    p->controller->uninstall(irq);
+
+    p->controller = NULL;
+    p->irq_name = NULL;
+    p->parameter = NULL;
+    p->flags = 0;
+    p->handler = NULL;
+
+    return 1;
 }
