@@ -7,6 +7,60 @@
 #include "gate.h"
 #include "printk.h"
 #include "memory.h"
+
+// 主要赋值 bit[16]屏蔽0 不屏蔽 其他位不变
+void IOAPIC_enable(unsigned long irq)
+{
+    unsigned long value = 0;
+    value = ioapic_rte_read((irq - 32) * 2 + 0x10);
+    value = value & (~0x10000UL);
+    ioapic_rte_write((irq - 32) * 2 + 0x10, value);
+}
+
+// 主要赋值 bit[16]屏蔽1 屏蔽 其他位不变
+void IOAPIC_disable(unsigned long irq)
+{
+    unsigned long value = 0;
+    value = ioapic_rte_read((irq - 32) * 2 + 0x10);
+    value = value | 0x10000UL;
+    ioapic_rte_write((irq - 32) * 2 + 0x10, value);
+}
+
+unsigned long IOAPIC_install(unsigned long irq, void *arg)
+{
+    struct IO_APIC_RET_entry *entry = (struct IO_APIC_RET_entry *)arg;
+    ioapic_rte_write((irq - 32) * 2 + 0x10, *(unsigned long *)entry);
+
+    return 1;
+}
+
+void IOAPIC_uninstall(unsigned long irq)
+{
+    // 赋予初始值
+    ioapic_rte_write((irq - 32) * 2 + 0x10, 0x10000UL);
+}
+
+// 和下面的都是通过msr操作local apic eoi寄存器
+void IOAPIC_level_ack(unsigned long irq)
+{
+    __asm__ __volatile__("movq	$0x00,	%%rdx	\n\t"
+                         "movq	$0x00,	%%rax	\n\t"
+                         "movq 	$0x80b,	%%rcx	\n\t"
+                         "wrmsr	\n\t" ::
+                             : "memory");
+
+    *ioapic_map.virtual_EOI_address = irq;
+}
+
+void IOAPIC_edge_ack(unsigned long irq)
+{
+    __asm__ __volatile__("movq	$0x00,	%%rdx	\n\t"
+                         "movq	$0x00,	%%rax	\n\t"
+                         "movq 	$0x80b,	%%rcx	\n\t"
+                         "wrmsr	\n\t" ::
+                             : "memory");
+}
+
 // IOWIN 32bit 但是RTE64bit 所以读写操作都是两次index定位
 unsigned long ioapic_rte_read(unsigned char index)
 {
@@ -288,23 +342,11 @@ void APIC_IOAPIC_init()
 
 void do_IRQ(struct pt_regs *regs, unsigned long nr) // regs:rsp,nr
 {
-    unsigned char x;
     irq_desc_T *irq = &interrupt_desc[nr - 32];
 
-    x = io_in8(0x60);
-    color_printk(BLUE, WHITE, "(IRQ:%#04x)\tkey code:%#04x\n", nr, x);
-
-    // 执行中断上半部分
     if (irq->handler != NULL)
         irq->handler(nr, irq->parameter, regs);
 
-    // 先应答
     if (irq->controller != NULL && irq->controller->ack != NULL)
         irq->controller->ack(nr);
-
-    __asm__ __volatile__("movq	$0x00,	%%rdx	\n\t"
-                         "movq	$0x00,	%%rax	\n\t"
-                         "movq 	$0x80b,	%%rcx	\n\t"
-                         "wrmsr	\n\t" ::
-                             : "memory");
 }
