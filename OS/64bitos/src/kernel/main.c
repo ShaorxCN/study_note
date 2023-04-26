@@ -7,10 +7,10 @@
 #include "task.h"
 #include "cpu.h"
 
-
 #if APIC
 #include "APIC.h"
 #include "keyboard.h"
+#include "mouse.h"
 #else
 #include "8259A.h"
 #endif
@@ -200,6 +200,12 @@ void Start_Kernel(void)
 	color_printk(RED, BLACK, "interrupt init \n");
 #if APIC
 	APIC_IOAPIC_init();
+
+	color_printk(RED, BLACK, "keyboard init \n");
+	keyboard_init();
+
+	color_printk(RED, BLACK, "mouse init \n");
+	mouse_init();
 #else
 	init_8259A();
 #endif
@@ -207,11 +213,15 @@ void Start_Kernel(void)
 	// task_init();
 
 #if APIC
-	while(1)
-		analysis_keycode();
+	while (1)
+	{
+		if (p_kb->count)
+			analysis_keycode();
+		if (p_mouse->count)
+			analysis_mousecode();
+	}
 #else
-	while(1)
+	while (1)
 		;
 #endif
-	
 }

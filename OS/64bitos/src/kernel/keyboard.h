@@ -320,6 +320,8 @@ struct keyboard_inputbuffer
     unsigned char buf[KB_BUF_SIZE];
 };
 
+void keyboard_init();
+void keyboard_exit();
 void analysis_keycode();
 
 #endif
