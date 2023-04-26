@@ -220,7 +220,7 @@ void keyboard_init()
     wait_KB_write();
     io_out8(PORT_KB_DATA, KB_INIT_MODE);
 
-    // 等待低俗的键盘控制器把控制指令执行完成  因为60h cmd是没有应答 但是应该通过20h读取来判断？
+    // 等待低速的键盘控制器把控制指令执行完成  因为60h cmd是没有应答 但是应该通过20h读取来判断？
     for (i = 0; i < 1000; i++)
         for (j = 0; j < 1000; j++)
             nop();

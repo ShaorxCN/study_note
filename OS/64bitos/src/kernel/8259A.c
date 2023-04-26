@@ -7,7 +7,7 @@
 #include "ptrace.h"
 
 // 默认硬件
-void init_interrupt()
+void init_8259A()
 {
     int i;
     for (i = 32; i < 56; i++)
@@ -40,7 +40,7 @@ void init_interrupt()
     通过rdi rsi寄存器传送参数  rsp和中断号
     统一入口
 */
-void do_IRQ(unsigned long regs, unsigned long nr) // regs:rsp,nr
+void do_IRQ(struct pt_regs * regs, unsigned long nr) // regs:rsp,nr
 {
     unsigned char x;
     color_printk(RED, BLACK, "do_IRQ:%#08x\t", nr);

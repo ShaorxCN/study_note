@@ -1,6 +1,6 @@
 CFLAGS  = -mcmodel=large -fno-builtin -m64
 ASFLAGS = --64
-PIC = APIC
+PIC = __8259A__
 
 # -S 去除符号表和relocation信息
 # -R 去除指定section信息
@@ -15,9 +15,14 @@ all: system
 # -b target 指定输入文件的文件格式
 # -z muldefs 允许重复定义 遇见重复定义的时候 只使用第一个
 # 总体ld命令中式按照文件顺序一次链接的 所以head.o 需要作为第一个才能放到lds文件中指定的位置
+
+ifeq (${PIC},APIC)
 system:	head.o entry.o main.o printk.o trap.o memory.o interrupt.o PIC.o task.o cpu.o keyboard.o
 	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o  main.o printk.o trap.o interrupt.o PIC.o task.o cpu.o keyboard.o -T Kernel.lds 
-
+else
+system:	head.o entry.o main.o printk.o trap.o memory.o interrupt.o PIC.o task.o cpu.o 
+	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o  main.o printk.o trap.o interrupt.o PIC.o task.o cpu.o  -T Kernel.lds 
+endif
 head.o:	head.S
 # -E表示仅预处理 不执行编译汇编或者链接 预处理 编译生成汇编代码一类  汇编生成obj
 	gcc -E  head.S > head.s

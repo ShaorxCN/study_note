@@ -6,10 +6,11 @@
 #include "interrupt.h"
 #include "task.h"
 #include "cpu.h"
-#include "keyboard.h"
+
 
 #if APIC
 #include "APIC.h"
+#include "keyboard.h"
 #else
 #include "8259A.h"
 #endif
@@ -204,6 +205,13 @@ void Start_Kernel(void)
 #endif
 	// color_printk(RED, BLACK, "task_init \n");
 	// task_init();
-	while (1)
+
+#if APIC
+	while(1)
 		analysis_keycode();
+#else
+	while(1)
+		;
+#endif
+	
 }
