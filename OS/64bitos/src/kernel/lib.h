@@ -224,6 +224,17 @@ static inline void io_out32(unsigned short port, unsigned int value)
 						 : "memory");
 }
 
+// 按照字为单位的io读写
+// INSW指令从DX指出的外设端口输入字到由ES: DI指定的存储器中，且根据方向标志位DF和串操作的类型来修改DI的值。
+// D DI
+#define port_insw(port, buffer, nr)                                               \
+	__asm__ __volatile__("cld;rep;insw;mfence;" ::"d"(port), "D"(buffer), "c"(nr) \
+						 : "memory")
+
+#define port_outsw(port, buffer, nr)                                               \
+	__asm__ __volatile__("cld;rep;outsw;mfence;" ::"d"(port), "S"(buffer), "c"(nr) \
+						 : "memory")
+
 /*
 	wrmsr
 	address: msr index 通过ecx指定
@@ -233,6 +244,17 @@ static inline void wrmsr(unsigned long address, unsigned long value)
 {
 	__asm__ __volatile__("wrmsr \n\t" ::"d"(value >> 32), "a"(value & 0xffffffff), "c"(address)
 						 : "memory");
+}
+
+static inline unsigned long rdmsr(unsigned long address)
+{
+	unsigned int tmp0 = 0;
+	unsigned int tmp1 = 0;
+	__asm__ __volatile__("rdmsr	\n\t"
+						 : "=d"(tmp0), "=a"(tmp1)
+						 : "c"(address)
+						 : "memory");
+	return (unsigned long)tmp0 << 32 | tmp1;
 }
 
 #endif
