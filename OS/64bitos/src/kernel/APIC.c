@@ -188,6 +188,8 @@ void Local_APIC_init()
 
     if (x & 0x100)
         color_printk(WHITE, BLACK, "SVR[8] enabled\n");
+    if (x&0x1000)
+		color_printk(WHITE,BLACK,"SVR[12] enabled\n");
 
     // 读取local apic id寄存器和版本寄存器
 

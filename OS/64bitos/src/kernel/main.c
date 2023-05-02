@@ -110,7 +110,7 @@ void Start_Kernel(void)
 
 	// color_printk(ORANGE, BLACK, "4.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
 	// color_printk(WHITE, BLACK, "kmalloc test\n");
-	struct Page *page = NULL;
+	// struct Page *page = NULL;
 	// void *tmp = NULL;
 	// struct Slab *slab = NULL;
 	// for (i = 0; i < 16; i++)
@@ -159,43 +159,43 @@ void Start_Kernel(void)
 	// color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *memory_management_struct.bits_map);
 	// color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *(memory_management_struct.bits_map + 1));
 
-	page = alloc_pages(ZONE_NORMAL, 63, 0);
-	page = alloc_pages(ZONE_NORMAL, 63, 0);
+	// page = alloc_pages(ZONE_NORMAL, 63, 0);
+	// page = alloc_pages(ZONE_NORMAL, 63, 0);
 
-	color_printk(ORANGE, BLACK, "4.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
+	// color_printk(ORANGE, BLACK, "4.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
 
-	for (i = 80; i <= 85; i++)
-	{
-		color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-		i++;
-		color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	}
+	// for (i = 80; i <= 85; i++)
+	// {
+	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
+	// 	i++;
+	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
+	// }
 
-	for (i = 140; i <= 145; i++)
-	{
-		color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-		i++;
-		color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	}
+	// for (i = 140; i <= 145; i++)
+	// {
+	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
+	// 	i++;
+	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
+	// }
 
-	free_pages(page, 1);
+	// free_pages(page, 1);
 
-	color_printk(ORANGE, BLACK, "5.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
+	// color_printk(ORANGE, BLACK, "5.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
 
-	for (i = 75; i <= 85; i++)
-	{
-		color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-		i++;
-		color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	}
+	// for (i = 75; i <= 85; i++)
+	// {
+	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
+	// 	i++;
+	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
+	// }
 
-	page = alloc_pages(ZONE_UNMAPED, 63, 0);
+	// page = alloc_pages(ZONE_UNMAPED, 63, 0);
 
-	color_printk(ORANGE, BLACK, "6.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *(memory_management_struct.bits_map + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), *(memory_management_struct.bits_map + 1 + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_using_count, (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_free_count);
+	// color_printk(ORANGE, BLACK, "6.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *(memory_management_struct.bits_map + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), *(memory_management_struct.bits_map + 1 + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_using_count, (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_free_count);
 
-	free_pages(page, 1);
+	// free_pages(page, 1);
 
-	color_printk(ORANGE, BLACK, "7.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *(memory_management_struct.bits_map + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), *(memory_management_struct.bits_map + 1 + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_using_count, (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_free_count);
+	// color_printk(ORANGE, BLACK, "7.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *(memory_management_struct.bits_map + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), *(memory_management_struct.bits_map + 1 + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_using_count, (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_free_count);
 
 	color_printk(RED, BLACK, "interrupt init \n");
 #if APIC
