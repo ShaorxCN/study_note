@@ -58,7 +58,18 @@ void disk_init()
     // 设备配置寄存器初始化 LBA模式
     io_out8(PORT_DISK1_DEVICE, 0xf0);
     // 识别指令
-    io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
+    //  io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
+
+    io_out8(PORT_DISK1_ERR_FEATURE,0);
+	io_out8(PORT_DISK1_SECTOR_CNT,1);
+	io_out8(PORT_DISK1_SECTOR_LOW,0);
+	io_out8(PORT_DISK1_SECTOR_MID,0);
+	io_out8(PORT_DISK1_SECTOR_HIGH,0);
+	
+	while(!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY));
+	color_printk(ORANGE,WHITE,"Send CMD:%02x\n",io_in8(PORT_DISK1_STATUS_CMD));
+	
+	io_out8(PORT_DISK1_STATUS_CMD,0x20);	////read
 }
 
 void disk_exit()

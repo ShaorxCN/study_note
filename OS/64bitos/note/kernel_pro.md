@@ -352,7 +352,7 @@ I/O APIC作为中断请求的中转芯片，不停地将外部I/O设备发送来
 2. 然后通过msr配置svr寄存器使能xapic和x2apic 开启local apic 并配置eoi广播禁止项。
 3. 然后读取apic id 和version寄存器。并且初始化的时候mask lvt 因为我们还没有配置处理程序。然后读取tpr 和 ppr。
 4. 这里已经使能apic且初始化了local apic.然后使ioapic的初始化并且通过imcr强制过apic。
-5. 实际配置io apic。因为io apic使主板芯片组上的一个控制器芯片。且通电后默认关闭。先通过OIC寄存器的bit8开启io apic.OIC寄存器位于芯片组配置寄存器的31FEh-31FFh偏移处。RCBA寄存器（Root Complex Base Address Register）保存着芯片组配置寄存器的物理基地址(bit[31:14])，它位于PCI总线的LPC桥控制器组（第31号设备）的F0h偏移地址处。这边RCBA的相关信息需要根据实际平台查询可得.RCBA寄存器是一个位于LPC桥控制器组中的4B寄存器，LPC桥控制器组是PCI总线下的第31号设备，RCBA寄存器在LPC寄存器组的F0h偏移处。RCBA寄存器的默认值是00000000h.RCBA寄存器的第0位是RCBA寄存器的使能标志位，置位此标志位将允许修改芯片组配置寄存器的物理基地址。第14位~第31位保存着芯片组配置寄存器的物理基地址，其物理地址必须按16 KB边界对齐。。OIC寄存器是一个2 B的中断控制寄存器，通过它可以开启和关闭I/O APIC。OIC寄存器位于芯片组配置寄存器组的31FEh地址偏移处，而芯片组配置寄存器组的物理基地址则由RCBA寄存器指定。下面使OIC的说明</br><img src="./img/oic.png"></br>如图 主要是使能bit置位然后协处理器错误使能标志位置位则是允许IRQ13接收FERR#中断请求。
+5. 实际配置io apic。因为io apic使主板芯片组上的一个控制器芯片。且通电后默认关闭。先通过OIC寄存器的bit8开启io apic.OIC寄存器位于芯片组配置寄存器的31FEh-31FFh偏移处。RCBA寄存器（Root Complex Base Address Register）保存着芯片组配置寄存器的物理基地址(bit[31:14])，它位于PCI总线的LPC桥控制器组（第31号设备）的F0h偏移地址处。这边RCBA的相关信息需要根据实际平台查询可得.RCBA寄存器是一个位于LPC桥控制器组中的4B寄存器，LPC桥控制器组是PCI总线下的第31号设备，RCBA寄存器在LPC寄存器组的F0h偏移处。RCBA寄存器的默认值是00000000h.RCBA寄存器的第0位是RCBA寄存器的使能标志位，置位此标志位将允许修改芯片组配置寄存器的物理基地址。第14位~第31位保存着芯片组配置寄存器的物理基地址，其物理地址必须按16 KB边界对齐。。OIC(other Interrupt control register)寄存器是一个2 B的中断控制寄存器，通过它可以开启和关闭I/O APIC。OIC寄存器位于芯片组配置寄存器组的31FEh地址偏移处，而芯片组配置寄存器组的物理基地址则由RCBA寄存器指定。下面使OIC的说明</br><img src="./img/oic.png"></br>如图 主要是使能bit置位然后协处理器错误使能标志位置位则是允许IRQ13接收FERR#中断请求。
 6. 配置设置rcba 以及oic寄存器 开启 以及配置RTE寄存器 是否屏蔽以及触发模式等
 
 

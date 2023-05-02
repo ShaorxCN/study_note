@@ -337,9 +337,6 @@ struct Disk_Identify_Info // ATA/ATAPI-8
     unsigned short Integrity_word;
 } __attribute__((packed));
 
-/*
-
-*/
 
 void disk_init();
 
