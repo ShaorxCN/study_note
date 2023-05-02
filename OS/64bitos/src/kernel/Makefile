@@ -1,7 +1,7 @@
 CFLAGS  = -mcmodel=large -fno-builtin -m64
 ASFLAGS = --64
 PIC = APIC
-
+VM = VM
 # -S 去除符号表和relocation信息
 # -R 去除指定section信息
 # -O 指定输出文件格式
@@ -49,7 +49,7 @@ interrupt.o: interrupt.c
 	gcc  $(CFLAGS) -c interrupt.c
 ifeq ($(PIC),APIC)
 PIC.o: APIC.c
-	gcc  $(CFLAGS) -c APIC.c -o PIC.o
+	gcc  $(CFLAGS) -c APIC.c -o PIC.o -D${VM}
 else
 PIC.o: 8259A.c
 	gcc  $(CFLAGS) -c 8259A.c -o PIC.o

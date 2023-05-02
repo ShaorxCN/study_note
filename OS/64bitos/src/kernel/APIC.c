@@ -218,9 +218,9 @@ void Local_APIC_init()
     else if (((x & 0xff) >= 0x10) && ((x & 0xff) <= 0x15))
         color_printk(WHITE, BLACK, "Integrated APIC\n");
 
-    // 屏蔽所有lvt中断
-    __asm__ __volatile__("movq   $0x82f,    %%rcx    \n\t" // CMCI
-                         "wrmsr  \n\t"
+    // 屏蔽所有lvt  bochs 不支持cmci
+    #ifdef VM
+         __asm__ __volatile__(
                          "movq   $0x832,    %%rcx    \n\t" // Timer
                          "wrmsr  \n\t"
                          "movq   $0x833,    %%rcx    \n\t" // Thermal Monitor
@@ -236,6 +236,14 @@ void Local_APIC_init()
                          :
                          : "a"(0x10000), "d"(0x00)
                          : "memory");
+    #else
+          __asm__ __volatile__("movq   $0x82f,    %%rcx    \n\t"
+                            "wrmsr  \n\t"
+                            :
+                            : "a"(0x10000), "d"(0x00)
+                            : "memory");
+    #endif
+
 
     color_printk(GREEN, BLACK, "Mask ALL LVT\n");
 
