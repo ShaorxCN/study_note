@@ -15,7 +15,7 @@
 
 #define KBCMD_WRITE_CMD 0x60
 #define KBCMD_READ_CMD 0x20 // 0x60参数读取键盘配置值
-
+extern struct keyboard_inputbuffer * p_kb;
 // 01000111 初始化传递的参数
 /*
 bit 0使能键盘中断IRQ1

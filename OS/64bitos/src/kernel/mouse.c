@@ -6,7 +6,7 @@
 #include "memory.h"
 #include "printk.h"
 
-static struct keyboard_inputbuffer *p_mouse = NULL;
+struct keyboard_inputbuffer * p_mouse = NULL;
 static int mouse_count = 0; // 计数 3B一个完整的数据包 所以是三次
 
 void mouse_handler(unsigned long nr, unsigned long parameter, struct pt_regs *regs)

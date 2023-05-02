@@ -1,6 +1,6 @@
 CFLAGS  = -mcmodel=large -fno-builtin -m64
 ASFLAGS = --64
-PIC = __8259A__
+PIC = APIC
 
 # -S 去除符号表和relocation信息
 # -R 去除指定section信息
