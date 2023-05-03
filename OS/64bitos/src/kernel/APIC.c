@@ -321,29 +321,30 @@ void APIC_IOAPIC_init()
     // init ioapic
     IOAPIC_init();
 
-    // get RCBA address
-    // x86 使用 0xCFC（配置数据端口）和 0xCF8（配置地址端口）来访问 PCI 端点设备。
-    // 通过间接寻址的方式所引导rcba 他是pci总线的第31号LPC桥控制器组的F0h偏移地址处，即总线0的31号设备0功能的F0h偏移
-    // RCBA寄存器的地址计算公式（通过I/O端口间接索引PCI总线上的设备地址）为0x80000000 | (0 << 16) | (31 << 11) | (0 << 8) | (0xF0 & 0xfc) = 0x8000f8f0
-    io_out32(0xcf8, 0x8000f8f0);
-    // 索引到了后读取
-    x = io_in32(0xcfc);
-    color_printk(RED, BLACK, "Get RCBA Address:%#010x\n", x);
-    // bit[31:14]
-    x = x & 0xffffc000;
-    color_printk(RED, BLACK, "Get RCBA Address:%#010x\n", x);
+    // 我的是HM170芯片组 这边已经不用做rcba oic寄存器的初始化了 直接做好local apic和 ioapic本身的初始化即可
+    // // get RCBA address
+    // // x86 使用 0xCFC（配置数据端口）和 0xCF8（配置地址端口）来访问 PCI 端点设备。
+    // // 通过间接寻址的方式所引导rcba 他是pci总线的第31号LPC桥控制器组的F0h偏移地址处，即总线0的31号设备0功能的F0h偏移
+    // // RCBA寄存器的地址计算公式（通过I/O端口间接索引PCI总线上的设备地址）为0x80000000 | (0 << 16) | (31 << 11) | (0 << 8) | (0xF0 & 0xfc) = 0x8000f8f0
+    // io_out32(0xcf8, 0x8000f8f0);
+    // // 索引到了后读取
+    // x = io_in32(0xcfc);
+    // color_printk(RED, BLACK, "Get RCBA Address:%#010x\n", x);
+    // // bit[31:14]
+    // x = x & 0xffffc000;
+    // color_printk(RED, BLACK, "Get RCBA Address:%#010x\n", x);
 
-    // get OIC address
-    if (x > 0xfec00000 && x < 0xfee00000)
-    {
-        p = (unsigned int *)Phy_To_Virt(x + 0x31feUL);
-    }
+    // // get OIC address
+    // if (x > 0xfec00000 && x < 0xfee00000)
+    // {
+    //     p = (unsigned int *)Phy_To_Virt(x + 0x31feUL);
+    // }
 
-    // enable IOAPIC
-    x = (*p & 0xffffff00) | 0x100;
-    io_mfence();
-    *p = x;
-    io_mfence();
+    // // enable IOAPIC
+    // x = (*p & 0xffffff00) | 0x100;
+    // io_mfence();
+    // *p = x;
+    // io_mfence();
 
     memset(interrupt_desc, 0, sizeof(irq_desc_T) * NR_IRQS);
     // open IF eflages
