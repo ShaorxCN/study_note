@@ -177,7 +177,7 @@ void Local_APIC_init()
     __asm__ __volatile__("movq 	$0x80f,	%%rcx	\n\t"
                          "rdmsr	\n\t"
                          "bts	$8,	%%rax	\n\t"
-                         "bts	$12,	%%rax\n\t"
+                         // "bts	$12,	%%rax\n\t"
                          "wrmsr	\n\t"
                          "movq 	$0x80f,	%%rcx	\n\t"
                          "rdmsr	\n\t"

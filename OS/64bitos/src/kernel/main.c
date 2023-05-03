@@ -11,6 +11,7 @@
 #include "APIC.h"
 #include "keyboard.h"
 #include "mouse.h"
+#include "disk.h"
 #else
 #include "8259A.h"
 #endif
@@ -206,6 +207,9 @@ void Start_Kernel(void)
 
 	color_printk(RED, BLACK, "mouse init \n");
 	mouse_init();
+
+	color_printk(RED, BLACK, "disk init \n");
+	disk_init();
 #else
 	init_8259A();
 #endif
