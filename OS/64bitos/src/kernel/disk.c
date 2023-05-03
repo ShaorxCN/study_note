@@ -69,8 +69,8 @@ void disk_init()
     io_out8(PORT_DISK1_SECTOR_LOW, 0);
     io_out8(PORT_DISK1_SECTOR_MID, 0);
     io_out8(PORT_DISK1_SECTOR_HIGH, 0);
-    // 设备配置寄存器初始化 LBA模式
-    io_out8(PORT_DISK1_DEVICE, 0xf0);
+    // 设备配置寄存器初始化 LBA模式 这边还是虚拟机 挂在ata1-master 他的主控制器设置的端口就是170 所以这边0xe0实际是主硬盘 但是是通过17x端口控制
+    io_out8(PORT_DISK1_DEVICE, 0xe0);
     // 识别指令
     io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
 
