@@ -20,8 +20,6 @@ void disk_handler(unsigned long nr, unsigned long parameter, struct pt_regs *reg
     // struct Disk_Identify_Info a;
     // unsigned short *p = NULL;
     unsigned char a[512];
-    // 读取256个word 就是512B
-    port_insw(PORT_DISK1_DATA, &a, 256);
 
     // color_printk(ORANGE, WHITE, "\nSerial Number:");
     // for (i = 0; i < 10; i++)
@@ -42,10 +40,15 @@ void disk_handler(unsigned long nr, unsigned long parameter, struct pt_regs *reg
     //     color_printk(ORANGE, WHITE, "%04x ", *(p + i));
     while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
         ;
-    // 读取扇区数据
     color_printk(ORANGE, WHITE, "command finished:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
-    for (i = 0; i < 512; i++)
-        color_printk(ORANGE, WHITE, "%02x", a[i]);
+    // 当有数据请求的时候尝试读取数据
+    while (io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_REQ)
+    {
+        // 读取256个word 就是512B
+        port_insw(PORT_DISK1_DATA, &a, 256);
+        for (i = 0; i < 512; i++)
+            color_printk(ORANGE, WHITE, "%02x", a[i]);
+    }
 }
 
 void disk_init()
