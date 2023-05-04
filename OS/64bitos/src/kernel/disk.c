@@ -17,26 +17,33 @@ hw_int_controller disk_int_controller =
 void disk_handler(unsigned long nr, unsigned long parameter, struct pt_regs *regs)
 {
     int i = 0;
-    struct Disk_Identify_Info a;
-    unsigned short *p = NULL;
+    // struct Disk_Identify_Info a;
+    // unsigned short *p = NULL;
+    unsigned char a[512];
     port_insw(PORT_DISK1_DATA, &a, 256);
 
-    color_printk(ORANGE, WHITE, "\nSerial Number:");
-    for (i = 0; i < 10; i++)
-        color_printk(ORANGE, WHITE, "%c%c", (a.Serial_Number[i] >> 8) & 0xff, a.Serial_Number[i] & 0xff);
+    // color_printk(ORANGE, WHITE, "\nSerial Number:");
+    // for (i = 0; i < 10; i++)
+    //     color_printk(ORANGE, WHITE, "%c%c", (a.Serial_Number[i] >> 8) & 0xff, a.Serial_Number[i] & 0xff);
 
-    color_printk(ORANGE, WHITE, "\nFirmware revision:");
-    for (i = 0; i < 4; i++)
-        color_printk(ORANGE, WHITE, "%c%c", (a.Firmware_Version[i] >> 8) & 0xff, a.Firmware_Version[i] & 0xff);
+    // color_printk(ORANGE, WHITE, "\nFirmware revision:");
+    // for (i = 0; i < 4; i++)
+    //     color_printk(ORANGE, WHITE, "%c%c", (a.Firmware_Version[i] >> 8) & 0xff, a.Firmware_Version[i] & 0xff);
 
-    color_printk(ORANGE, WHITE, "\nModel number:");
-    for (i = 0; i < 20; i++)
-        color_printk(ORANGE, WHITE, "%c%c", (a.Model_Number[i] >> 8) & 0xff, a.Model_Number[i] & 0xff);
-    color_printk(ORANGE, WHITE, "\n");
+    // color_printk(ORANGE, WHITE, "\nModel number:");
+    // for (i = 0; i < 20; i++)
+    //     color_printk(ORANGE, WHITE, "%c%c", (a.Model_Number[i] >> 8) & 0xff, a.Model_Number[i] & 0xff);
+    // color_printk(ORANGE, WHITE, "\n");
 
-    p = (unsigned short *)&a;
-    for (i = 0; i < 256; i++)
-        color_printk(ORANGE, WHITE, "%04x ", *(p + i));
+    // p = (unsigned short *)&a;
+    // 这边读取出来的是word 记得是大端序 例如这边寻址扇区的范围是 fe00 001f 然后按照单个word大端序重新排就是  0x001ffe00个扇区
+    // for (i = 0; i < 256; i++)
+    //     color_printk(ORANGE, WHITE, "%04x ", *(p + i));
+
+    // 读取扇区数据
+    color_printk(ORANGE, WHITE, "Read one sector finished:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
+    for (i = 0; i < 512; i++)
+        color_printk(ORANGE, WHITE, "%02x\n", a[i]);
 }
 
 void disk_init()
@@ -72,19 +79,19 @@ void disk_init()
     // 设备配置寄存器初始化 LBA模式 这边还是虚拟机 挂在ata1-master 他的主控制器设置的端口就是170 所以这边0xe0实际是主硬盘 但是是通过17x端口控制
     io_out8(PORT_DISK1_DEVICE, 0xe0);
     // 识别指令
-    io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
+    // io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
 
-    // io_out8(PORT_DISK1_ERR_FEATURE, 0);
-    // io_out8(PORT_DISK1_SECTOR_CNT, 1);
-    // io_out8(PORT_DISK1_SECTOR_LOW, 0);
-    // io_out8(PORT_DISK1_SECTOR_MID, 0);
-    // io_out8(PORT_DISK1_SECTOR_HIGH, 0);
+    io_out8(PORT_DISK1_ERR_FEATURE, 0);
+    io_out8(PORT_DISK1_SECTOR_CNT, 1);
+    io_out8(PORT_DISK1_SECTOR_LOW, 0);
+    io_out8(PORT_DISK1_SECTOR_MID, 0);
+    io_out8(PORT_DISK1_SECTOR_HIGH, 0);
 
-    // while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
-    //     ;
-    // color_printk(ORANGE, WHITE, "Send CMD:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
+    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
+        ;
+    color_printk(ORANGE, WHITE, "Send CMD:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
 
-    // io_out8(PORT_DISK1_STATUS_CMD, 0x20); ////read
+    io_out8(PORT_DISK1_STATUS_CMD, 0x20); ////read
 }
 
 void disk_exit()
