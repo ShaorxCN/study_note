@@ -15,13 +15,15 @@
 
 #define PORT_DISK0_ALT_STA_CTL 0x3f6
 
+// 根据bochs配置 我们使用这边
+// ech 硬件设备识别 20h 读扇区(28bitLBA) 24h扩展读扇区(48bit LBA)  30h 写扇区(28bitLBA) 34h 扩展写扇区(48bit LBA)
 #define PORT_DISK1_DATA 0x170
 #define PORT_DISK1_ERR_FEATURE 0x171
 #define PORT_DISK1_SECTOR_CNT 0x172
 #define PORT_DISK1_SECTOR_LOW 0x173
 #define PORT_DISK1_SECTOR_MID 0x174
 #define PORT_DISK1_SECTOR_HIGH 0x175
-#define PORT_DISK1_DEVICE 0x176
+#define PORT_DISK1_DEVICE 0x176 // 除了配置寄存器使用 还有28LBA的最高的4bit 前面的只有24+这边的4 是28bit寻址
 #define PORT_DISK1_STATUS_CMD 0x177
 
 // 从控制器控制端口

@@ -20,6 +20,7 @@ void disk_handler(unsigned long nr, unsigned long parameter, struct pt_regs *reg
     // struct Disk_Identify_Info a;
     // unsigned short *p = NULL;
     unsigned char a[512];
+    // 读取256个word 就是512B
     port_insw(PORT_DISK1_DATA, &a, 256);
 
     // color_printk(ORANGE, WHITE, "\nSerial Number:");
@@ -39,17 +40,18 @@ void disk_handler(unsigned long nr, unsigned long parameter, struct pt_regs *reg
     // 这边读取出来的是word 记得是大端序 例如这边寻址扇区的范围是 fe00 001f 然后按照单个word大端序重新排就是  0x001ffe00个扇区
     // for (i = 0; i < 256; i++)
     //     color_printk(ORANGE, WHITE, "%04x ", *(p + i));
-
+    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
+        ;
     // 读取扇区数据
-    color_printk(ORANGE, WHITE, "Read one sector finished:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
+    color_printk(ORANGE, WHITE, "command finished:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
     for (i = 0; i < 512; i++)
-        color_printk(ORANGE, WHITE, "%02x\n", a[i]);
+        color_printk(ORANGE, WHITE, "%02x", a[i]);
 }
 
 void disk_init()
 {
     struct IO_APIC_RET_entry entry;
-
+    unsigned char a[512];
     // IRQ15 还是边沿触发
     entry.vector = 0x2f;
     entry.deliver_mode = APIC_ICR_IOAPIC_Fixed;
@@ -69,9 +71,48 @@ void disk_init()
 
     // 使能 普通操作
     io_out8(PORT_DISK1_ALT_STA_CTL, 0);
-    io_out8(PORT_DISK1_ERR_FEATURE, 0);
-    // 操作扇区数0
+    // io_out8(PORT_DISK1_ERR_FEATURE, 0);
+
+    while ((io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_BUSY))
+        ;
+    io_out8(PORT_DISK1_DEVICE, 0x40); // 这边配置寄存器改为48bitLBA
+    // 48bit的第一次操作开始
+    io_out8(PORT_DISK1_ERR_FEATURE, 0); // 双次操作要求都是0
+    // 操作扇区数的高8bit
     io_out8(PORT_DISK1_SECTOR_CNT, 0);
+
+    // lba的48bit寻址的高24位
+    io_out8(PORT_DISK1_SECTOR_LOW, 0);
+    io_out8(PORT_DISK1_SECTOR_MID, 0);
+    io_out8(PORT_DISK1_SECTOR_HIGH, 0);
+
+    // 第二次
+    io_out8(PORT_DISK1_ERR_FEATURE, 0);
+    // 操作扇区数的低8bit
+    io_out8(PORT_DISK1_SECTOR_CNT, 1);
+
+    // lba的48bit寻址的低24位
+    io_out8(PORT_DISK1_SECTOR_LOW, 0x12);
+    io_out8(PORT_DISK1_SECTOR_MID, 0);
+    io_out8(PORT_DISK1_SECTOR_HIGH, 0);
+
+    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
+        ;
+    color_printk(ORANGE, WHITE, "Send CMD:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
+    io_out8(PORT_DISK1_STATUS_CMD, 0x34); // 48LBA write
+
+    // 等待数据请求 也就是数据缓冲区准备就绪
+    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_REQ))
+        ;
+
+    memset(&a, 0xA5, 512);
+    port_outsw(PORT_DISK1_DATA, &a, 256); // 数据传入
+
+    // 等待就绪 重新28bit LBA read
+    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
+        ;
+
+    io_out8(PORT_DISK1_DEVICE, 0x40);
     // lba的24bit寻址
     io_out8(PORT_DISK1_SECTOR_LOW, 0);
     io_out8(PORT_DISK1_SECTOR_MID, 0);
@@ -81,9 +122,10 @@ void disk_init()
     // 识别指令
     // io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
 
+    // 使用46bitLBA  写入扇区数据
     io_out8(PORT_DISK1_ERR_FEATURE, 0);
     io_out8(PORT_DISK1_SECTOR_CNT, 1);
-    io_out8(PORT_DISK1_SECTOR_LOW, 0);
+    io_out8(PORT_DISK1_SECTOR_LOW, 0x24);
     io_out8(PORT_DISK1_SECTOR_MID, 0);
     io_out8(PORT_DISK1_SECTOR_HIGH, 0);
 
