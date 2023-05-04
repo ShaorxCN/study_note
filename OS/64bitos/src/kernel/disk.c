@@ -112,20 +112,16 @@ void disk_init()
     while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
         ;
 
-    io_out8(PORT_DISK1_DEVICE, 0x40);
-    // lba的24bit寻址
-    io_out8(PORT_DISK1_SECTOR_LOW, 0);
-    io_out8(PORT_DISK1_SECTOR_MID, 0);
-    io_out8(PORT_DISK1_SECTOR_HIGH, 0);
     // 设备配置寄存器初始化 LBA模式 这边还是虚拟机 挂在ata1-master 他的主控制器设置的端口就是170 所以这边0xe0实际是主硬盘 但是是通过17x端口控制
     io_out8(PORT_DISK1_DEVICE, 0xe0);
+
     // 识别指令
     // io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
 
-    // 使用46bitLBA  写入扇区数据
+    // 使用24bitLBA  读取扇区数据
     io_out8(PORT_DISK1_ERR_FEATURE, 0);
     io_out8(PORT_DISK1_SECTOR_CNT, 1);
-    io_out8(PORT_DISK1_SECTOR_LOW, 0x24);
+    io_out8(PORT_DISK1_SECTOR_LOW, 0x12);
     io_out8(PORT_DISK1_SECTOR_MID, 0);
     io_out8(PORT_DISK1_SECTOR_HIGH, 0);
 
