@@ -15,8 +15,7 @@
 
 #define PORT_DISK0_ALT_STA_CTL 0x3f6
 
-// 根据bochs配置 我们使用这边
-// ech 硬件设备识别 20h 读扇区(28bitLBA) 24h扩展读扇区(48bit LBA)  30h 写扇区(28bitLBA) 34h 扩展写扇区(48bit LBA)
+// 根据bochs配置 我们使用这边的几个端口
 #define PORT_DISK1_DATA 0x170
 #define PORT_DISK1_ERR_FEATURE 0x171
 #define PORT_DISK1_SECTOR_CNT 0x172
@@ -34,6 +33,41 @@
 #define DISK_STATUS_SEEK (1 << 4)
 #define DISK_STATUS_REQ (1 << 3)
 #define DISK_STATUS_ERROR (1 << 0)
+
+// ech 硬件设备识别 20h 读扇区(28bitLBA) 24h扩展读扇区(48bit LBA)  30h 写扇区(28bitLBA) 34h 扩展写扇区(48bit LBA)
+#define ATA_READ_CMD 0x24
+#define ATA_WRITE_CMD 0x34
+#define GET_IDENTIFY_DISK_CMD 0xEC
+
+struct block_buffer_node
+{
+    unsigned int count; // 扇区数量
+    unsigned char cmd;
+    unsigned long LBA; // 寻址扇区no
+    unsigned char *buffer;
+    void (*end_handler)(unsigned long nr, unsigned long parameter); // 请求执行后的处理方法 主要是data端口的操作
+
+    struct List list;
+};
+
+// 请求队列结构体 其中依旧是通过 container_of 或者请求本身
+struct request_queue
+{
+    struct List queue_list;             // 请求队列
+    struct block_buffer_node *in_using; // 当前正在执行的请求
+    long block_request_count;           // 剩余请求数
+};
+
+struct request_queue disk_request;
+struct block_device_operation IDE_device_operation;
+
+struct block_device_operation
+{
+    long (*open)();
+    long (*close)();
+    long (*ioctl)(long cmd, long arg);
+    long (*transfer)(long cmd, unsigned long blocks, long count, unsigned char *buffer);
+};
 
 struct Disk_Identify_Info // ATA/ATAPI-8
 {

@@ -14,47 +14,243 @@ hw_int_controller disk_int_controller =
         .ack = IOAPIC_edge_ack,
 };
 
+// 硬盘状态 0表示空闲
+static int disk_flags = 0;
+long cmd_out()
+{
+    struct block_buffer_node *node = disk_request.in_using = container_of(list_next(&disk_request.queue_list), struct block_buffer_node, list);
+    list_del(&disk_request.in_using->list);
+    disk_request.block_request_count--;
+
+    while (io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_BUSY)
+        nop();
+
+    switch (node->cmd)
+    {
+    case ATA_WRITE_CMD:
+
+        io_out8(PORT_DISK1_DEVICE, 0x40); // 设置寻址模式
+
+        io_out8(PORT_DISK1_ERR_FEATURE, 0);
+        io_out8(PORT_DISK1_SECTOR_CNT, (node->count >> 8) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_LOW, (node->LBA >> 24) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_MID, (node->LBA >> 32) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_HIGH, (node->LBA >> 40) & 0xff);
+
+        io_out8(PORT_DISK1_ERR_FEATURE, 0);
+        io_out8(PORT_DISK1_SECTOR_CNT, node->count & 0xff);
+        io_out8(PORT_DISK1_SECTOR_LOW, node->LBA & 0xff);
+        io_out8(PORT_DISK1_SECTOR_MID, (node->LBA >> 8) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_HIGH, (node->LBA >> 16) & 0xff);
+
+        while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
+            nop();
+        io_out8(PORT_DISK1_STATUS_CMD, node->cmd);
+
+        while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_REQ))
+            nop();
+        port_outsw(PORT_DISK1_DATA, node->buffer, 256);
+        break;
+
+    case ATA_READ_CMD:
+
+        io_out8(PORT_DISK1_DEVICE, 0x40);
+
+        io_out8(PORT_DISK1_ERR_FEATURE, 0);
+        io_out8(PORT_DISK1_SECTOR_CNT, (node->count >> 8) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_LOW, (node->LBA >> 24) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_MID, (node->LBA >> 32) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_HIGH, (node->LBA >> 40) & 0xff);
+
+        io_out8(PORT_DISK1_ERR_FEATURE, 0);
+        io_out8(PORT_DISK1_SECTOR_CNT, node->count & 0xff);
+        io_out8(PORT_DISK1_SECTOR_LOW, node->LBA & 0xff);
+        io_out8(PORT_DISK1_SECTOR_MID, (node->LBA >> 8) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_HIGH, (node->LBA >> 16) & 0xff);
+
+        while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
+            nop();
+        io_out8(PORT_DISK1_STATUS_CMD, node->cmd);
+        break;
+
+    case GET_IDENTIFY_DISK_CMD:
+
+        io_out8(PORT_DISK1_DEVICE, 0xe0);
+
+        io_out8(PORT_DISK1_ERR_FEATURE, 0);
+        io_out8(PORT_DISK1_SECTOR_CNT, node->count & 0xff);
+        io_out8(PORT_DISK1_SECTOR_LOW, node->LBA & 0xff);
+        io_out8(PORT_DISK1_SECTOR_MID, (node->LBA >> 8) & 0xff);
+        io_out8(PORT_DISK1_SECTOR_HIGH, (node->LBA >> 16) & 0xff);
+
+        while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
+            nop();
+        io_out8(PORT_DISK1_STATUS_CMD, node->cmd);
+
+    default:
+        color_printk(BLACK, WHITE, "ATA CMD Error\n");
+        break;
+    }
+    return 1;
+}
+// 请求结束时在各个handler中触发 并且检查是否当前还有请求 有的话继续执行
+void end_request()
+{
+    kfree((unsigned long *)disk_request.in_using);
+    disk_request.in_using = NULL;
+
+    disk_flags = 0;
+
+    if (disk_request.block_request_count)
+        cmd_out();
+}
+
+void add_request(struct block_buffer_node *node)
+{
+    list_add_to_before(&disk_request.queue_list, &node->list);
+    disk_request.block_request_count++;
+}
+
+void read_handler(unsigned long nr, unsigned long parameter)
+{
+    struct block_buffer_node *node = ((struct request_queue *)parameter)->in_using;
+
+    if (io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_ERROR)
+        color_printk(RED, BLACK, "read_handler:%#010x\n", io_in8(PORT_DISK1_ERR_FEATURE));
+    else
+        port_insw(PORT_DISK1_DATA, node->buffer, 256);
+
+    end_request();
+}
+
+void write_handler(unsigned long nr, unsigned long parameter)
+{
+    if (io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_ERROR)
+        color_printk(RED, BLACK, "write_handler:%#010x\n", io_in8(PORT_DISK1_ERR_FEATURE));
+
+    end_request();
+}
+
+void other_handler(unsigned long nr, unsigned long parameter)
+{
+    struct block_buffer_node *node = ((struct request_queue *)parameter)->in_using;
+
+    if (io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_ERROR)
+        color_printk(RED, BLACK, "other_handler:%#010x\n", io_in8(PORT_DISK1_ERR_FEATURE));
+    else
+        port_insw(PORT_DISK1_DATA, node->buffer, 256);
+
+    end_request();
+}
+
+// 创建请求 cmd:指令  blocks 扇区开始地址 count 扇区数量 buffer数据缓冲区
+struct block_buffer_node *make_request(long cmd, unsigned long blocks, long count, unsigned char *buffer)
+{
+    struct block_buffer_node *node = (struct block_buffer_node *)kmalloc(sizeof(struct block_buffer_node), 0);
+    list_init(&node->list);
+
+    switch (cmd)
+    {
+    case ATA_READ_CMD:
+        node->end_handler = read_handler;
+        node->cmd = ATA_READ_CMD;
+        break;
+
+    case ATA_WRITE_CMD:
+        node->end_handler = write_handler;
+        node->cmd = ATA_WRITE_CMD;
+        break;
+
+    default: ///
+        node->end_handler = other_handler;
+        node->cmd = cmd;
+        break;
+    }
+
+    node->LBA = blocks;
+    node->count = count;
+    node->buffer = buffer;
+
+    return node;
+}
+
+void submit(struct block_buffer_node *node)
+{
+    add_request(node);
+
+    if (disk_request.in_using == NULL)
+        cmd_out();
+}
+
+void wait_for_finish()
+{
+    disk_flags = 1;
+    while (disk_flags)
+        nop();
+}
+
+long IDE_open()
+{
+    color_printk(BLACK, WHITE, "DISK1 Opened\n");
+    return 1;
+}
+
+long IDE_close()
+{
+    color_printk(BLACK, WHITE, "DISK1 Closed\n");
+    return 1;
+}
+
+// 发送指令功能
+long IDE_ioctl(long cmd, long arg)
+{
+    struct block_buffer_node *node = NULL;
+
+    if (cmd == GET_IDENTIFY_DISK_CMD)
+    {
+        node = make_request(cmd, 0, 0, (unsigned char *)arg);
+        submit(node);
+        wait_for_finish();
+        return 1;
+    }
+
+    return 0;
+}
+
+// 数据访问功能
+long IDE_transfer(long cmd, unsigned long blocks, long count, unsigned char *buffer)
+{
+    struct block_buffer_node *node = NULL;
+    if (cmd == ATA_READ_CMD || cmd == ATA_WRITE_CMD)
+    {
+        node = make_request(cmd, blocks, count, buffer);
+        submit(node);
+        wait_for_finish();
+    }
+    else
+    {
+        return 0;
+    }
+
+    return 1;
+}
+
+struct block_device_operation IDE_device_operation = {
+    .open = IDE_open,
+    .close = IDE_close,
+    .ioctl = IDE_ioctl,
+    .transfer = IDE_transfer,
+};
+
 void disk_handler(unsigned long nr, unsigned long parameter, struct pt_regs *regs)
 {
-    int i = 0;
-    // struct Disk_Identify_Info a;
-    // unsigned short *p = NULL;
-    unsigned char a[512];
-
-    // color_printk(ORANGE, WHITE, "\nSerial Number:");
-    // for (i = 0; i < 10; i++)
-    //     color_printk(ORANGE, WHITE, "%c%c", (a.Serial_Number[i] >> 8) & 0xff, a.Serial_Number[i] & 0xff);
-
-    // color_printk(ORANGE, WHITE, "\nFirmware revision:");
-    // for (i = 0; i < 4; i++)
-    //     color_printk(ORANGE, WHITE, "%c%c", (a.Firmware_Version[i] >> 8) & 0xff, a.Firmware_Version[i] & 0xff);
-
-    // color_printk(ORANGE, WHITE, "\nModel number:");
-    // for (i = 0; i < 20; i++)
-    //     color_printk(ORANGE, WHITE, "%c%c", (a.Model_Number[i] >> 8) & 0xff, a.Model_Number[i] & 0xff);
-    // color_printk(ORANGE, WHITE, "\n");
-
-    // p = (unsigned short *)&a;
-    // 这边读取出来的是word 记得是大端序 例如这边寻址扇区的范围是 fe00 001f 然后按照单个word大端序重新排就是  0x001ffe00个扇区
-    // for (i = 0; i < 256; i++)
-    //     color_printk(ORANGE, WHITE, "%04x ", *(p + i));
-    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
-        ;
-    color_printk(ORANGE, WHITE, "command finished:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
-    // 当有数据请求的时候尝试读取数据
-    while (io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_REQ)
-    {
-        // 读取256个word 就是512B
-        port_insw(PORT_DISK1_DATA, &a, 256);
-        for (i = 0; i < 512; i++)
-            color_printk(ORANGE, WHITE, "%02x", a[i]);
-    }
+    struct block_buffer_node *node = ((struct request_queue *)parameter)->in_using;
+    node->end_handler(nr, parameter);
 }
 
 void disk_init()
 {
     struct IO_APIC_RET_entry entry;
-    unsigned char a[512];
     // IRQ15 还是边沿触发
     entry.vector = 0x2f;
     entry.deliver_mode = APIC_ICR_IOAPIC_Fixed;
@@ -70,69 +266,18 @@ void disk_init()
     entry.destination.physical.phy_dest = 0;
     entry.destination.physical.reserved2 = 0;
 
-    register_irq(0x2f, &entry, &disk_handler, 0, &disk_int_controller, "disk1");
+    register_irq(0x2f, &entry, &disk_handler, (unsigned long)&disk_request, &disk_int_controller, "disk1");
 
     // 使能 普通操作
     io_out8(PORT_DISK1_ALT_STA_CTL, 0);
-    // io_out8(PORT_DISK1_ERR_FEATURE, 0);
 
     while ((io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_BUSY))
         ;
-    io_out8(PORT_DISK1_DEVICE, 0x40); // 这边配置寄存器改为48bitLBA
-    // 48bit的第一次操作开始
-    io_out8(PORT_DISK1_ERR_FEATURE, 0); // 双次操作要求都是0
-    // 操作扇区数的高8bit
-    io_out8(PORT_DISK1_SECTOR_CNT, 0);
+    list_init(&disk_request.queue_list);
+    disk_request.in_using = NULL;
+    disk_request.block_request_count = 0;
 
-    // lba的48bit寻址的高24位
-    io_out8(PORT_DISK1_SECTOR_LOW, 0);
-    io_out8(PORT_DISK1_SECTOR_MID, 0);
-    io_out8(PORT_DISK1_SECTOR_HIGH, 0);
-
-    // 第二次
-    io_out8(PORT_DISK1_ERR_FEATURE, 0);
-    // 操作扇区数的低8bit
-    io_out8(PORT_DISK1_SECTOR_CNT, 1);
-
-    // lba的48bit寻址的低24位
-    io_out8(PORT_DISK1_SECTOR_LOW, 0x12);
-    io_out8(PORT_DISK1_SECTOR_MID, 0);
-    io_out8(PORT_DISK1_SECTOR_HIGH, 0);
-
-    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
-        ;
-    color_printk(ORANGE, WHITE, "Send CMD:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
-    io_out8(PORT_DISK1_STATUS_CMD, 0x34); // 48LBA write
-
-    // 等待数据请求 也就是数据缓冲区准备就绪
-    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_REQ))
-        ;
-
-    memset(&a, 0xA5, 512);
-    port_outsw(PORT_DISK1_DATA, &a, 256); // 数据传入
-
-    // 等待就绪 重新28bit LBA read
-    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
-        ;
-
-    // 设备配置寄存器初始化 LBA模式 这边还是虚拟机 挂在ata1-master 他的主控制器设置的端口就是170 所以这边0xe0实际是主硬盘 但是是通过17x端口控制
-    io_out8(PORT_DISK1_DEVICE, 0xe0);
-
-    // 识别指令
-    // io_out8(PORT_DISK1_STATUS_CMD, 0xec); // identify
-
-    // 使用24bitLBA  读取扇区数据
-    io_out8(PORT_DISK1_ERR_FEATURE, 0);
-    io_out8(PORT_DISK1_SECTOR_CNT, 1);
-    io_out8(PORT_DISK1_SECTOR_LOW, 0x12);
-    io_out8(PORT_DISK1_SECTOR_MID, 0);
-    io_out8(PORT_DISK1_SECTOR_HIGH, 0);
-
-    while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
-        ;
-    color_printk(ORANGE, WHITE, "Send CMD:%02x\n", io_in8(PORT_DISK1_STATUS_CMD));
-
-    io_out8(PORT_DISK1_STATUS_CMD, 0x20); ////read
+    disk_flags = 0;
 }
 
 void disk_exit()
