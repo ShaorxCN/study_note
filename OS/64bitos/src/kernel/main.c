@@ -217,13 +217,13 @@ void Start_Kernel(void)
 	char buf[512];
 	color_printk(PURPLE, BLACK, "disk write:\n");
 	memset(buf, 0x44, 512);
-	IDE_device_operation.transfer(ATA_WRITE_CMD, 0x12345678, 1, (unsigned char *)buf);
+	IDE_device_operation.transfer(ATA_WRITE_CMD, 0x12, 1, (unsigned char *)buf);
 
 	color_printk(PURPLE, BLACK, "disk write end\n");
 
 	color_printk(PURPLE, BLACK, "disk read:\n");
 	memset(buf, 0x00, 512);
-	IDE_device_operation.transfer(ATA_READ_CMD, 0x12345678, 1, (unsigned char *)buf);
+	IDE_device_operation.transfer(ATA_READ_CMD, 0x12, 1, (unsigned char *)buf);
 
 	for (i = 0; i < 512; i++)
 		color_printk(BLACK, WHITE, "%02x", buf[i]);

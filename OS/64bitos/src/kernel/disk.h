@@ -59,7 +59,7 @@ struct request_queue
 };
 
 struct request_queue disk_request;
-struct block_device_operation IDE_device_operation;
+extern struct block_device_operation IDE_device_operation;
 
 struct block_device_operation
 {

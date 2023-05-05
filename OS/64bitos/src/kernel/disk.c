@@ -86,7 +86,7 @@ long cmd_out()
         while (!(io_in8(PORT_DISK1_STATUS_CMD) & DISK_STATUS_READY))
             nop();
         io_out8(PORT_DISK1_STATUS_CMD, node->cmd);
-
+        break;
     default:
         color_printk(BLACK, WHITE, "ATA CMD Error\n");
         break;
@@ -177,14 +177,13 @@ struct block_buffer_node *make_request(long cmd, unsigned long blocks, long coun
 void submit(struct block_buffer_node *node)
 {
     add_request(node);
-
+    disk_flags = 1; // 从wait中移到这儿 保证中断回调之前先赋值1  待优化
     if (disk_request.in_using == NULL)
         cmd_out();
 }
 
 void wait_for_finish()
 {
-    disk_flags = 1;
     while (disk_flags)
         nop();
 }
