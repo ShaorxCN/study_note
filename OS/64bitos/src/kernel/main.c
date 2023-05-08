@@ -200,47 +200,69 @@ void Start_Kernel(void)
 
 	color_printk(RED, BLACK, "interrupt init \n");
 #if APIC
-	APIC_IOAPIC_init();
+	// APIC_IOAPIC_init();
 
-	color_printk(RED, BLACK, "keyboard init \n");
-	keyboard_init();
+	// color_printk(RED, BLACK, "keyboard init \n");
+	// keyboard_init();
 
-	color_printk(RED, BLACK, "mouse init \n");
-	mouse_init();
+	// color_printk(RED, BLACK, "mouse init \n");
+	// mouse_init();
 
-	color_printk(RED, BLACK, "disk init \n");
-	disk_init();
+	// color_printk(RED, BLACK, "disk init \n");
+	// disk_init();
+
+	Local_APIC_init();
+	color_printk(RED, BLACK, "ICR init\n");
+
+	*(unsigned char *)0xffff800000020000 = 0xf4; // hlt
+
+	// msr配置icr 先发的INIT 再发start-up
+	__asm__ __volatile__("movq $0x00,%%rdx \n\t"
+						 "movq $0xc4500,%%rax \n\t"
+						 "movq $0x830,%%rcx \n\t" // INIT IPI
+						 "wrmsr \n\t"
+						 "movq $0x00,%% rdx \n\t "
+						 "movq $0xc4620,%%rax \n\t"
+						 "movq $0x830,%%rcx \n\t" // start-up IPI
+						 "wrmsr \n\t"
+						 "movq $0x00,%% rdx \n\t "
+						 "movq $0xc4620,%%rax \n\t"
+						 "movq $0x830,%%rcx \n\t" // start-up IPI again
+						 "wrmsr \n\t" ::
+							 : "memory");
 #else
 	init_8259A();
 #endif
 
-	char buf[512];
-	color_printk(PURPLE, BLACK, "disk write:\n");
-	memset(buf, 0x44, 512);
-	IDE_device_operation.transfer(ATA_WRITE_CMD, 0x12, 1, (unsigned char *)buf);
+	// char buf[512];
+	// color_printk(PURPLE, BLACK, "disk write:\n");
+	// memset(buf, 0x44, 512);
+	// IDE_device_operation.transfer(ATA_WRITE_CMD, 0x12, 1, (unsigned char *)buf);
 
-	color_printk(PURPLE, BLACK, "disk write end\n");
+	// color_printk(PURPLE, BLACK, "disk write end\n");
 
-	color_printk(PURPLE, BLACK, "disk read:\n");
-	memset(buf, 0x00, 512);
-	IDE_device_operation.transfer(ATA_READ_CMD, 0x12, 1, (unsigned char *)buf);
+	// color_printk(PURPLE, BLACK, "disk read:\n");
+	// memset(buf, 0x00, 512);
+	// IDE_device_operation.transfer(ATA_READ_CMD, 0x12, 1, (unsigned char *)buf);
 
-	for (i = 0; i < 512; i++)
-		color_printk(BLACK, WHITE, "%02x", buf[i]);
-	color_printk(PURPLE, BLACK, "\ndisk read end\n");
+	// for (i = 0; i < 512; i++)
+	// 	color_printk(BLACK, WHITE, "%02x", buf[i]);
+	// color_printk(PURPLE, BLACK, "\ndisk read end\n");
 	// color_printk(RED, BLACK, "task_init \n");
 	// task_init();
 
-#if APIC
-	while (1)
-	{
-		if (p_kb->count)
-			analysis_keycode();
-		if (p_mouse->count)
-			analysis_mousecode();
-	}
-#else
+	// #if APIC
+	// 	while (1)
+	// 	{
+	// 		if (p_kb->count)
+	// 			analysis_keycode();
+	// 		if (p_mouse->count)
+	// 			analysis_mousecode();
+	// 	}
+	// #else
+	// 	while (1)
+	// 		;
+	// #endif
 	while (1)
 		;
-#endif
 }

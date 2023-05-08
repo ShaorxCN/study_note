@@ -347,7 +347,7 @@ I/O APIC作为中断请求的中转芯片，不停地将外部I/O设备发送来
 
 #### local apic 初始化
 
-这边将中断控制器的配置和管理拆分到8259A.c和APIC.c.interrupt.c则是中断处理机制的实现。
+这边将中断控制器的配置和管理拆分到8259A.c和APIC.c.interrupt.c则是中断处理机制的实现。(rcba oic部分不需要了)
 1. 首先通过cpuid查看是否支持apic xapic  x2apic
 2. 然后通过msr配置svr寄存器使能xapic和x2apic 开启local apic 并配置eoi广播禁止项。
 3. 然后读取apic id 和version寄存器。并且初始化的时候mask lvt 因为我们还没有配置处理程序。然后读取tpr 和 ppr。
