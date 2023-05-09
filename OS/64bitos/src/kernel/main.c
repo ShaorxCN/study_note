@@ -12,6 +12,7 @@
 #include "keyboard.h"
 #include "mouse.h"
 #include "disk.h"
+#include "SMP.h"
 #else
 #include "8259A.h"
 #endif
@@ -214,22 +215,27 @@ void Start_Kernel(void)
 	Local_APIC_init();
 	color_printk(RED, BLACK, "ICR init\n");
 
-	*(unsigned char *)0xffff800000020000 = 0xf4; // hlt
+	// *(unsigned char *)0xffff800000020000 = 0xf4; // hlt
 
-	// msr配置icr 先发的INIT 再发start-up
-	__asm__ __volatile__("movq $0x00,%%rdx \n\t"
-						 "movq $0xc4500,%%rax \n\t"
-						 "movq $0x830,%%rcx \n\t" // INIT IPI
-						 "wrmsr \n\t"
-						 "movq $0x00,%% rdx \n\t "
-						 "movq $0xc4620,%%rax \n\t"
-						 "movq $0x830,%%rcx \n\t" // start-up IPI
-						 "wrmsr \n\t"
-						 "movq $0x00,%% rdx \n\t "
-						 "movq $0xc4620,%%rax \n\t"
-						 "movq $0x830,%%rcx \n\t" // start-up IPI again
-						 "wrmsr \n\t" ::
-							 : "memory");
+	// // msr配置icr 先发的INIT 再发start-up
+	// __asm__ __volatile__("movq $0x00,%%rdx \n\t"
+	// 					 "movq $0xc4500,%%rax \n\t"
+	// 					 "movq $0x830,%%rcx \n\t" // INIT IPI
+	// 					 "wrmsr \n\t"
+	// 					 "movq $0x00,%% rdx \n\t "
+	// 					 "movq $0xc4620,%%rax \n\t" // 物理模式 start up  向所有发送(除自己) 向量号0x20 那么startup的其实地址应该是000vv000 就是20000
+	// 					 "movq $0x830,%%rcx \n\t"	// start-up IPI
+	// 					 "wrmsr \n\t"
+	// 					 "movq $0x00,%% rdx \n\t "
+	// 					 "movq $0xc4620,%%rax \n\t"
+	// 					 "movq $0x830,%%rcx \n\t" // start-up IPI again
+	// 					 "wrmsr \n\t" ::
+	// 						 : "memory");
+	SMP_init();
+	wrmsr(0x830, 0xc4500); // INIT IPI
+
+	wrmsr(0x830, 0xc4620); // Start-up IPI
+	wrmsr(0x830, 0xc4620); // Start-up IPI
 #else
 	init_8259A();
 #endif
