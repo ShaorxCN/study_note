@@ -55,6 +55,11 @@ entry64:
 	movq	%rax,	%ss
 	movq	_stack_start(%rip),	%rsp		// 指定ldle内核栈指针
 
+	movq $0x1b,%rcx  // if apu
+	rdmsr
+	bt $8,%rax
+	jnc start_smp
+
 // 设置IDT  256*16B
 /*
 leaq 从目标内存地址load 64bit给rdx 这里也就是将ignore_int 模块加载进来 rdx:rax 分别是高8B和低8B
@@ -128,6 +133,15 @@ setup_TSS64:
 // .quad 表示8字节  也就是这里的标号值就是函数地址 然后放入rax 最后lretq
 go_to_kernel:
 	.quad	Start_Kernel
+
+start_smp:
+	movq go_to_smp_kernel(%rip),%rax
+	pushq $0x08
+	pushq %rax
+	lretq
+
+go_to_smp_kernel:
+	.quad Start_SMP
 //=======	ignore_int
 // 中断处理程序内容
 // 这里为color_printk 准备参数

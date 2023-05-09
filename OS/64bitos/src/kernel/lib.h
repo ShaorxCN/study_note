@@ -25,6 +25,7 @@
 #define io_mfence() __asm__ __volatile__("mfence	\n\t" :: \
 											 : "memory")
 
+#define hlt() __asm__ __volatile__("hlt	\n\t")
 // 双向链表
 struct List
 {

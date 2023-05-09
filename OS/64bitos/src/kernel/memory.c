@@ -412,8 +412,9 @@ void init_memory()
 
     // 将前10页清零 也就是清除线性地址0和0xffff800000000000在页表中的重映射(只保留 0xffff800000000000) 但是这样task_init就无法执行了
     // 设计只需需要清1个 header.S中只有index 0 和 256 设置了
-    for (i = 0; i < 10; i++)
-        *(Phy_To_Virt(Global_CR3) + i) = 0UL;
+    // 再次放开 因为apu的初始化用到
+    // for (i = 0; i < 10; i++)
+    //     *(Phy_To_Virt(Global_CR3) + i) = 0UL;
 
     flush_tlb();
 }

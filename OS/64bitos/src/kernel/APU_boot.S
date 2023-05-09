@@ -106,7 +106,10 @@ _APU_Code64:
 	movq	%rax,	%gs
 	movq	%rax,	%ss
 
-	hlt
+	// 跳转到1m处的head.S
+	movq  $0x100000,%rax
+	jmpq *%rax
+
 
 .balign 4
 _APU_tmp_IDT:

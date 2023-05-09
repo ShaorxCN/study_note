@@ -84,6 +84,71 @@ struct IO_APIC_RET_entry
     } destination;         // 目标
 } __attribute__((packed)); // 紧凑模式 不对齐
 
+// ICR
+struct INT_CMD_REG
+{
+    unsigned int vector : 8, // 0~7
+        deliver_mode : 3,    // 8~10
+        dest_mode : 1,       // 11
+        deliver_status : 1,  // 12
+        res_1 : 1,           // 13
+        level : 1,           // 14
+        trigger : 1,         // 15
+        res_2 : 2,           // 16~17
+        dest_shorthand : 2,  // 18~19
+        res_3 : 12;          // 20~31
+
+    union
+    {
+        struct
+        {
+            unsigned int res_4 : 24, // 32~55
+                dest_field : 8;      // 56~63
+        } apic_destination;
+
+        unsigned int x2apic_destination; // 32~63
+    } destination;
+
+} __attribute__((packed));
+
+/*
+    icr的相关bit位
+*/
+
+// mask
+#define APIC_ICR_IOAPIC_Masked 1
+#define APIC_ICR_IOAPIC_UN_Masked 0
+
+// trigger mode
+#define APIC_ICR_IOAPIC_Edge 0
+#define APIC_ICR_IOAPIC_Level 1
+
+// delivery status
+#define APIC_ICR_IOAPIC_Idle 0
+#define APIC_ICR_IOAPIC_Send_Pending 1
+
+// destination shorthand
+#define ICR_No_Shorthand 0
+#define ICR_Self 1
+#define ICR_ALL_INCLUDE_Self 2
+#define ICR_ALL_EXCLUDE_Self 3
+
+// destination mode
+#define ICR_IOAPIC_DELV_PHYSICAL 0
+#define ICR_IOAPIC_DELV_LOGIC 1
+
+// level
+#define ICR_LEVEL_DE_ASSERT 0
+#define ICR_LEVLE_ASSERT 1
+
+// remote irr
+#define APIC_IOAPIC_IRR_RESET 0
+#define APIC_IOAPIC_IRR_ACCEPT 1
+
+// pin polarity
+#define APIC_IOAPIC_POLARITY_HIGH 0
+#define APIC_IOAPIC_POLARITY_LOW 1
+
 // 协助间接访问寄存器
 struct IOAPIC_map
 {
