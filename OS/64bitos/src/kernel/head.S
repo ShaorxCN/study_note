@@ -305,7 +305,7 @@ GDT_Table:
     .quad    0x0000f20000000000    /*6 USER    Data 64-bit Segment 30*/
     .quad    0x00cf9a000000ffff    /*7 KERNEL Code 32-bit Segment 38*/
     .quad    0x00cf92000000ffff    /*8 KERNEL Data 32-bit Segment 40*/
-    .fill    10,8,0                /*10 ~ 11    TSS (jmp one segment <9>) in long-mode 128-bit 50*/
+    .fill    100,8,0                /*10 ~ 11    TSS (jmp one segment <9>) in long-mode 128-bit 50*/
 GDT_END:
 
 GDT_POINTER:                                            // 区分 这里是初始化结构以及定位指针 不是GDTR用 所以非48bit
@@ -315,7 +315,7 @@ GDT_BASE:     .quad    GDT_Table                       //  64bit base 保护模�
 //=======     IDT_Table
 
 .globl IDT_Table
-// .fill repeat , size（默认1） , value（默认0） size最多8 （byte） 如果size大于value 高位填充0
+// .fill repeat , size（默认1） , value（默认0） size最多8 （单位byte） 如果size大于value 高位填充0
 // 这里解释下  32bit下 结构为256*8byte  但是64bit下  256*16byte
 IDT_Table:
     .fill 512,8,0                       

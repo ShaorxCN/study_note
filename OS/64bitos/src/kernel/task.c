@@ -204,7 +204,7 @@ void __switch_to(struct task_struct *prev, struct task_struct *next)
     // 保存0环栈指针
     init_tss[0].rsp0 = next->thread->rsp0;
 
-    set_tss64(init_tss[0].rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
+    set_tss64(TSS64_Table, init_tss[0].rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
     __asm__ __volatile__("movq	%%fs,	%0 \n\t"
                          : "=a"(prev->thread->fs));
     __asm__ __volatile__("movq	%%gs,	%0 \n\t"
@@ -246,7 +246,7 @@ void task_init()
     wrmsr(0x175, current->thread->rsp0);      // 指定内核栈指针
     wrmsr(0x176, (unsigned long)system_call); // 指定rip 进入entry.S
     // 初始化 init_thread 和tss
-    set_tss64(init_thread.rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
+    set_tss64(TSS64_Table, init_thread.rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
 
     init_tss[0].rsp0 = init_thread.rsp0;
 

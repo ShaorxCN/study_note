@@ -2,6 +2,7 @@
 #include "lib.h"
 #include "printk.h"
 #include "cpu.h"
+#include "gate.h"
 void SMP_init()
 {
     int i;
@@ -67,5 +68,7 @@ void Start_SMP()
 
     color_printk(RED, YELLOW, "x2APIC ID:%#010x\n", x);
 
+    load_TR(12);
+    x = 1 / 0;
     hlt();
 }
