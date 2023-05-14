@@ -30,7 +30,7 @@ ENTRY(_start)
 	mov	%ax,	%gs
 	mov	%ax,	%ss
 
-	movq	$0x7E00,	%rsp
+	movq	_stack_start(%rip),	%rsp
 
 //=======	load	cr3
 

@@ -3,6 +3,8 @@
 
 #include <stdarg.h>
 #include "font.h"
+#include "spinlock.h"
+#include "linkage.h"
 
 #define ZEROPAD 1  /* pad with zero */
 #define SIGN 2	   /* unsigned/signed long */
@@ -51,6 +53,7 @@ struct position
 	// 起始地址和容量
 	unsigned int *FB_addr;
 	unsigned long FB_length;
+	spinlock_T printk_lock;
 } Pos;
 
 void frame_buffer_init();

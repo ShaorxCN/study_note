@@ -2,7 +2,7 @@
 #include "printk.h"
 #include "lib.h"
 #include "memory.h"
-
+#include "spinlock.h"
 // 重新映射vbe缓存帧
 void frame_buffer_init()
 {
@@ -358,6 +358,9 @@ int color_printk(unsigned int FRcolor, unsigned int BKcolor, const char *fmt, ..
 	int count = 0;
 	int line = 0;
 	va_list args;
+
+	spin_lock(&Pos.printk_lock);
+
 	va_start(args, fmt);
 
 	// 解析格式
@@ -416,5 +419,7 @@ int color_printk(unsigned int FRcolor, unsigned int BKcolor, const char *fmt, ..
 			Pos.YPosition = 0;
 		}
 	}
+
+	spin_unlock(&Pos.printk_lock);
 	return i;
 }

@@ -24,7 +24,7 @@ extern char _edata;
 extern char _end;
 
 struct Global_Memory_Descriptor memory_management_struct = {{0}, 0};
-
+int global_i = 0;
 void Start_Kernel(void)
 {
 	// header.S 中将帧缓存的物理地址(0xe0000000) 映射到0xffff800000a00000和0xa00000处
@@ -48,6 +48,7 @@ void Start_Kernel(void)
 	// Pos.FB_addr = (int *)0xffff800000a00000;
 	Pos.FB_addr = (int *)0xffff800003000000;
 	Pos.FB_length = (Pos.XResolution * Pos.YResolution * 4 + PAGE_4K_SIZE - 1) & PAGE_4K_MASK;
+	spin_init(&Pos.printk_lock);
 
 	// 色条展示部分
 	// for(i = 0 ;i<1440*20;i++)
@@ -84,13 +85,14 @@ void Start_Kernel(void)
 	// }
 
 	// color_printk(YELLOW,BLACK,"Hello\t\t World!\n");
+	spin_init(&Pos.printk_lock);
 
 	load_TR(10);
 	set_tss64(TSS64_Table, _stack_start, _stack_start, _stack_start,
 			  0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00);
 
 	sys_vector_init();
-	init_cpu();
+	// init_cpu();
 	// lds文件中将位置值赋给了这些_xxx 相比较c c中变量会变成符号表 然后去找符号表中的地址 int * a = &test 就是直接吧符号表中test保存的地址给a
 	// 对应lds文件中  _xxx 中的值就是对应的地址（不用再间接寻址了） &_xxx 就是他的值
 	memory_management_struct.start_code = (unsigned long)&_text;
@@ -109,95 +111,6 @@ void Start_Kernel(void)
 
 	color_printk(RED, BLACK, "pagetable init \n");
 	pagetable_init();
-
-	// color_printk(ORANGE, BLACK, "4.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
-	// color_printk(WHITE, BLACK, "kmalloc test\n");
-	// struct Page *page = NULL;
-	// void *tmp = NULL;
-	// struct Slab *slab = NULL;
-	// for (i = 0; i < 16; i++)
-	// {
-	// 	color_printk(RED, BLACK, "size:%#010x\t", kmalloc_cache_size[i].size);
-	// 	color_printk(RED, BLACK, "color_map(before):%#018lx\t", *kmalloc_cache_size[i].cache_pool->color_map);
-	// 	tmp = kmalloc(kmalloc_cache_size[i].size, 0);
-	// 	if (tmp == NULL)
-	// 		color_printk(RED, BLACK, "kmalloc size:%#010x ERROR\n", kmalloc_cache_size[i].size);
-	// 	color_printk(RED, BLACK, "color_map(middle):%#018lx\t", *kmalloc_cache_size[i].cache_pool->color_map);
-	// 	kfree(tmp);
-	// 	color_printk(RED, BLACK, "color_map(after):%#018lx\n", *kmalloc_cache_size[i].cache_pool->color_map);
-	// }
-
-	// kmalloc(kmalloc_cache_size[15].size, 0);
-	// kmalloc(kmalloc_cache_size[15].size, 0);
-	// kmalloc(kmalloc_cache_size[15].size, 0);
-	// kmalloc(kmalloc_cache_size[15].size, 0);
-	// kmalloc(kmalloc_cache_size[15].size, 0);
-	// kmalloc(kmalloc_cache_size[15].size, 0);
-	// kmalloc(kmalloc_cache_size[15].size, 0);
-
-	// color_printk(RED, BLACK, "color_map(0):%#018lx,%#018lx\n", kmalloc_cache_size[15].cache_pool->color_map, *kmalloc_cache_size[15].cache_pool->color_map);
-	// slab = container_of(list_next(&kmalloc_cache_size[15].cache_pool->list), struct Slab, list);
-	// color_printk(RED, BLACK, "color_map(1):%#018lx,%#018lx\n", slab->color_map, *slab->color_map);
-	// slab = container_of(list_next(&slab->list), struct Slab, list);
-	// color_printk(RED, BLACK, "color_map(2):%#018lx,%#018lx\n", slab->color_map, *slab->color_map);
-	// slab = container_of(list_next(&slab->list), struct Slab, list);
-	// color_printk(RED, BLACK, "color_map(3):%#018lx,%#018lx\n", slab->color_map, *slab->color_map);
-
-	// i = 1/0;
-	// i = *(int *)0xffff80000aa00000;
-	// struct Page *page = NULL;
-	// color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *memory_management_struct.bits_map);
-	// color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *(memory_management_struct.bits_map + 1));
-
-	// page = alloc_pages(ZONE_NORMAL, 64, PG_PTable_Maped | PG_Active | PG_Kernel);
-
-	// for (i = 0; i <= 64; i++)
-	// {
-	// 	color_printk(INDIGO, BLACK, "page%d\tattribute:%#018lx\taddress:%#018lx\t", i, (page + i)->attribute, (page + i)->PHY_address);
-	// 	i++;
-	// 	color_printk(INDIGO, BLACK, "page%d\tattribute:%#018lx\taddress:%#018lx\n", i, (page + i)->attribute, (page + i)->PHY_address);
-	// }
-
-	// color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *memory_management_struct.bits_map);
-	// color_printk(RED, BLACK, "memory_management_struct.bits_map:%#018lx\n", *(memory_management_struct.bits_map + 1));
-
-	// page = alloc_pages(ZONE_NORMAL, 63, 0);
-	// page = alloc_pages(ZONE_NORMAL, 63, 0);
-
-	// color_printk(ORANGE, BLACK, "4.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
-
-	// for (i = 80; i <= 85; i++)
-	// {
-	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	// 	i++;
-	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	// }
-
-	// for (i = 140; i <= 145; i++)
-	// {
-	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	// 	i++;
-	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	// }
-
-	// free_pages(page, 1);
-
-	// color_printk(ORANGE, BLACK, "5.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tmemory_management_struct.bits_map+2:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *memory_management_struct.bits_map, *(memory_management_struct.bits_map + 1), *(memory_management_struct.bits_map + 2), memory_management_struct.zones_struct->page_using_count, memory_management_struct.zones_struct->page_free_count);
-
-	// for (i = 75; i <= 85; i++)
-	// {
-	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\t", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	// 	i++;
-	// 	color_printk(INDIGO, BLACK, "page%03d attribute:%#018lx address:%#018lx\n", i, (memory_management_struct.pages_struct + i)->attribute, (memory_management_struct.pages_struct + i)->PHY_address);
-	// }
-
-	// page = alloc_pages(ZONE_UNMAPED, 63, 0);
-
-	// color_printk(ORANGE, BLACK, "6.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *(memory_management_struct.bits_map + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), *(memory_management_struct.bits_map + 1 + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_using_count, (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_free_count);
-
-	// free_pages(page, 1);
-
-	// color_printk(ORANGE, BLACK, "7.memory_management_struct.bits_map:%#018lx\tmemory_management_struct.bits_map+1:%#018lx\tzone_struct->page_using_count:%d\tzone_struct->page_free_count:%d\n", *(memory_management_struct.bits_map + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), *(memory_management_struct.bits_map + 1 + (page->PHY_address >> PAGE_2M_SHIFT >> 6)), (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_using_count, (memory_management_struct.zones_struct + ZONE_UNMAPED_INDEX)->page_free_count);
 
 	color_printk(RED, BLACK, "interrupt init \n");
 #if APIC
@@ -252,16 +165,22 @@ void Start_Kernel(void)
 	// wrmsr(0x830, 0xc4620); // Start-up IPI
 	// wrmsr(0x830, 0xc4620); // Start-up IPI
 	wrmsr(0x830, *(unsigned long *)&icr_entry); // INIT IPI
-	_stack_start = (unsigned long)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
-	tss = (unsigned int *)kmalloc(128, 0);
-	set_tss_descriptor(12, tss);
-	set_tss64(tss, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start);
+	// 这边双核四线程
+	for (global_i = 1; global_i < 4; global_i++)
+	{
+		spin_lock(&SMP_lock);
 
-	icr_entry.vector = 0x20;
-	icr_entry.deliver_mode = ICR_Start_up;
-
-	wrmsr(0x830, *(unsigned long *)&icr_entry); // Start-up IPI
-	wrmsr(0x830, *(unsigned long *)&icr_entry); // Start-up IPI
+		_stack_start = (unsigned long)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
+		tss = (unsigned int *)kmalloc(128, 0);
+		set_tss_descriptor(10 + global_i * 2, tss);
+		set_tss64(tss, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start);
+		icr_entry.vector = 0x20;
+		icr_entry.deliver_mode = ICR_Start_up;
+		icr_entry.dest_shorthand = ICR_No_Shorthand;
+		icr_entry.destination.x2apic_destination = global_i;
+		wrmsr(0x830, *(unsigned long *)&icr_entry); // Start-up IPI
+		wrmsr(0x830, *(unsigned long *)&icr_entry); // Start-up IPI
+	}
 
 #else
 	init_8259A();

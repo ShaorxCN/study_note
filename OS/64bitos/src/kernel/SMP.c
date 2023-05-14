@@ -19,7 +19,11 @@ void SMP_init()
     // 复制ap引导程序到0x20000处
     color_printk(WHITE, BLACK, "SMP copy byte:%#010x\n", (unsigned long)&_APU_boot_end - (unsigned long)&_APU_boot_start);
     memcpy(_APU_boot_start, (unsigned char *)0xffff800000020000, (unsigned long)&_APU_boot_end - (unsigned long)&_APU_boot_start);
+
+    spin_init(&SMP_lock);
 }
+
+extern int global_i;
 
 void Start_SMP()
 {
@@ -68,7 +72,7 @@ void Start_SMP()
 
     color_printk(RED, YELLOW, "x2APIC ID:%#010x\n", x);
 
-    load_TR(12);
-    x = 1 / 0;
+    load_TR(10 + (global_i - 1) * 2);
+    spin_unlock(&SMP_lock);
     hlt();
 }
