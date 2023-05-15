@@ -61,6 +61,15 @@ void IOAPIC_edge_ack(unsigned long irq)
                              : "memory");
 }
 
+void Local_APIC_edge_level_ack(unsigned long irq)
+{
+    __asm__ __volatile__("movq	$0x00,	%%rdx	\n\t"
+                         "movq	$0x00,	%%rax	\n\t"
+                         "movq 	$0x80b,	%%rcx	\n\t"
+                         "wrmsr	\n\t" ::
+                             : "memory");
+}
+
 // IOWIN 32bit 但是RTE64bit 所以读写操作都是两次index定位
 unsigned long ioapic_rte_read(unsigned char index)
 {
@@ -188,8 +197,8 @@ void Local_APIC_init()
 
     if (x & 0x100)
         color_printk(WHITE, BLACK, "SVR[8] enabled\n");
-    if (x&0x1000)
-		color_printk(WHITE,BLACK,"SVR[12] enabled\n");
+    if (x & 0x1000)
+        color_printk(WHITE, BLACK, "SVR[12] enabled\n");
 
     // 读取local apic id寄存器和版本寄存器
 
@@ -218,32 +227,31 @@ void Local_APIC_init()
     else if (((x & 0xff) >= 0x10) && ((x & 0xff) <= 0x15))
         color_printk(WHITE, BLACK, "Integrated APIC\n");
 
-    // 屏蔽所有lvt  bochs 不支持cmci
-    #ifdef VM
-         __asm__ __volatile__(
-                         "movq   $0x832,    %%rcx    \n\t" // Timer
-                         "wrmsr  \n\t"
-                         "movq   $0x833,    %%rcx    \n\t" // Thermal Monitor
-                         "wrmsr  \n\t"
-                         "movq   $0x834,    %%rcx    \n\t" // Performance Counter
-                         "wrmsr  \n\t"
-                         "movq   $0x835,    %%rcx    \n\t" // LINT0
-                         "wrmsr  \n\t"
-                         "movq   $0x836,    %%rcx    \n\t" // LINT1
-                         "wrmsr  \n\t"
-                         "movq   $0x837,    %%rcx    \n\t" // Error
+// 屏蔽所有lvt  bochs 不支持cmci
+#ifdef VM
+    __asm__ __volatile__(
+        "movq   $0x832,    %%rcx    \n\t" // Timer
+        "wrmsr  \n\t"
+        "movq   $0x833,    %%rcx    \n\t" // Thermal Monitor
+        "wrmsr  \n\t"
+        "movq   $0x834,    %%rcx    \n\t" // Performance Counter
+        "wrmsr  \n\t"
+        "movq   $0x835,    %%rcx    \n\t" // LINT0
+        "wrmsr  \n\t"
+        "movq   $0x836,    %%rcx    \n\t" // LINT1
+        "wrmsr  \n\t"
+        "movq   $0x837,    %%rcx    \n\t" // Error
+        "wrmsr  \n\t"
+        :
+        : "a"(0x10000), "d"(0x00)
+        : "memory");
+#else
+    __asm__ __volatile__("movq   $0x82f,    %%rcx    \n\t"
                          "wrmsr  \n\t"
                          :
                          : "a"(0x10000), "d"(0x00)
                          : "memory");
-    #else
-          __asm__ __volatile__("movq   $0x82f,    %%rcx    \n\t"
-                            "wrmsr  \n\t"
-                            :
-                            : "a"(0x10000), "d"(0x00)
-                            : "memory");
-    #endif
-
+#endif
 
     color_printk(GREEN, BLACK, "Mask ALL LVT\n");
 
@@ -353,11 +361,28 @@ void APIC_IOAPIC_init()
 
 void do_IRQ(struct pt_regs *regs, unsigned long nr) // regs:rsp,nr
 {
-    irq_desc_T *irq = &interrupt_desc[nr - 32];
+    // 这边区分一般中断和ipi中断  大于80的认为是ipi 交由local apic自己处理(这个判断感觉有点奇怪 但是暂时是可以满足的 因为这边是c8开始的10个 bit7 肯定是1)
+    switch (nr & 0x80)
+    {
+    case 0x00:
+    {
+        irq_desc_T *irq = &interrupt_desc[nr - 32];
 
-    if (irq->handler != NULL)
-        irq->handler(nr, irq->parameter, regs);
+        if (irq->handler != NULL)
+            irq->handler(nr, irq->parameter, regs);
 
-    if (irq->controller != NULL && irq->controller->ack != NULL)
-        irq->controller->ack(nr);
+        if (irq->controller != NULL && irq->controller->ack != NULL)
+            irq->controller->ack(nr);
+    }
+    break;
+    case 0x80:
+    {
+        color_printk(RED, BLACK, "SMP IPI :%d\n", nr);
+        Local_APIC_edge_level_ack(nr);
+    }
+    break;
+    default:
+        color_printk(RED, BLACK, "do_IRQ receive:%d\n", nr);
+        break;
+    }
 }

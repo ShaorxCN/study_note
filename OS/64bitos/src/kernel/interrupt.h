@@ -34,6 +34,7 @@ typedef struct
 #define NR_IRQS 24
 
 irq_desc_T interrupt_desc[NR_IRQS] = {0};
+irq_desc_T SMP_IPI_desc[10] = {0};
 
 int register_irq(unsigned long irq,
                  void *arg,
@@ -47,5 +48,5 @@ int unregister_irq(unsigned long irq);
 extern void (*interrupt[24])(void);
 
 extern void do_IRQ(struct pt_regs *regs, unsigned long nr);
-
+extern void (*SMP_interrupt[10])(void);
 #endif

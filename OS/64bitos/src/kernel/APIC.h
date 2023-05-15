@@ -173,5 +173,5 @@ unsigned long IOAPIC_install(unsigned long irq, void *arg);
 void IOAPIC_uninstall(unsigned long irq);
 void IOAPIC_level_ack(unsigned long irq);
 void IOAPIC_edge_ack(unsigned long irq);
-
+void Local_APIC_edge_level_ack(unsigned long irq);
 #endif

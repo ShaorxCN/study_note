@@ -182,6 +182,14 @@ void Start_Kernel(void)
 		wrmsr(0x830, *(unsigned long *)&icr_entry); // Start-up IPI
 	}
 
+	// ipi 中断测试 通过icr发送
+	icr_entry.vector = 0xc8;
+	icr_entry.destination.x2apic_destination = 1;
+	icr_entry.deliver_mode = APIC_ICR_IOAPIC_Fixed;
+	wrmsr(0x830, *(unsigned long *)&icr_entry);
+	icr_entry.vector = 0xc9;
+	wrmsr(0x830, *(unsigned long *)&icr_entry);
+
 #else
 	init_8259A();
 #endif

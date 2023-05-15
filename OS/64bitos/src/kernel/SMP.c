@@ -3,6 +3,7 @@
 #include "printk.h"
 #include "cpu.h"
 #include "gate.h"
+#include "interrupt.h"
 void SMP_init()
 {
     int i;
@@ -21,6 +22,12 @@ void SMP_init()
     memcpy(_APU_boot_start, (unsigned char *)0xffff800000020000, (unsigned long)&_APU_boot_end - (unsigned long)&_APU_boot_start);
 
     spin_init(&SMP_lock);
+
+    for (i = 200; i < 210; i++)
+    {
+        set_intr_gate(i, 2, SMP_interrupt[i - 200]);
+    }
+    memset(SMP_IPI_desc, 0, sizeof(irq_desc_T) * 10);
 }
 
 extern int global_i;
@@ -74,5 +81,8 @@ void Start_SMP()
 
     load_TR(10 + (global_i - 1) * 2);
     spin_unlock(&SMP_lock);
-    hlt();
+
+    sti();
+    while (1)
+        hlt();
 }
