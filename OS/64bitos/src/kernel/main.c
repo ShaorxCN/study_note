@@ -6,6 +6,7 @@
 #include "interrupt.h"
 #include "task.h"
 #include "cpu.h"
+#include "time.h"
 
 #if APIC
 #include "APIC.h"
@@ -182,17 +183,20 @@ void Start_Kernel(void)
 		wrmsr(0x830, *(unsigned long *)&icr_entry); // Start-up IPI
 	}
 
-	// ipi 中断测试 通过icr发送
-	icr_entry.vector = 0xc8;
-	icr_entry.destination.x2apic_destination = 1;
-	icr_entry.deliver_mode = APIC_ICR_IOAPIC_Fixed;
-	wrmsr(0x830, *(unsigned long *)&icr_entry);
-	icr_entry.vector = 0xc9;
-	wrmsr(0x830, *(unsigned long *)&icr_entry);
+	// // ipi 中断测试 通过icr发送
+	// icr_entry.vector = 0xc8;
+	// icr_entry.destination.x2apic_destination = 1;
+	// icr_entry.deliver_mode = APIC_ICR_IOAPIC_Fixed;
+	// wrmsr(0x830, *(unsigned long *)&icr_entry);
+	// icr_entry.vector = 0xc9;
+	// wrmsr(0x830, *(unsigned long *)&icr_entry);
 
 #else
 	init_8259A();
 #endif
+	struct time time;
+	get_cmos_time(&time);
+	color_printk(RED, BLACK, "year:%#010x,month:%#010x,day:%#010x,hour:%#010x,mintue:%#010x,second:%#010x\n", time.year, time.month, time.day, time.hour, time.minute, time.second);
 
 	// char buf[512];
 	// color_printk(PURPLE, BLACK, "disk write:\n");
@@ -211,18 +215,16 @@ void Start_Kernel(void)
 	// color_printk(RED, BLACK, "task_init \n");
 	// task_init();
 
-	// #if APIC
-	// 	while (1)
-	// 	{
-	// 		if (p_kb->count)
-	// 			analysis_keycode();
-	// 		if (p_mouse->count)
-	// 			analysis_mousecode();
-	// 	}
-	// #else
-	// 	while (1)
-	// 		;
-	// #endif
+#if APIC
+	while (1)
+	{
+		if (p_kb->count)
+			analysis_keycode();
+		if (p_mouse->count)
+			analysis_mousecode();
+	}
+#else
 	while (1)
 		;
+#endif
 }
