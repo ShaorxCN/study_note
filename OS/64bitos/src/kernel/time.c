@@ -12,7 +12,7 @@ int get_cmos_time(struct time *time)
     cli();
     do
     {
-        time->year = CMOS_READ(0x09) + CMOS_READ(0x32) * 100;
+        time->year = CMOS_READ(0x09) + CMOS_READ(0x32) * 0x100;
         time->month = CMOS_READ(0x08);
         time->day = CMOS_READ(0x07);
         time->hour = CMOS_READ(0x04);

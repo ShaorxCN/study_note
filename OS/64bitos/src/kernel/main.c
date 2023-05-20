@@ -116,16 +116,16 @@ void Start_Kernel(void)
 	color_printk(RED, BLACK, "interrupt init \n");
 #if APIC
 	unsigned int *tss = NULL;
-	// APIC_IOAPIC_init();
+	APIC_IOAPIC_init();
 
-	// color_printk(RED, BLACK, "keyboard init \n");
-	// keyboard_init();
+	color_printk(RED, BLACK, "keyboard init \n");
+	keyboard_init();
 
-	// color_printk(RED, BLACK, "mouse init \n");
-	// mouse_init();
+	color_printk(RED, BLACK, "mouse init \n");
+	mouse_init();
 
-	// color_printk(RED, BLACK, "disk init \n");
-	// disk_init();
+	color_printk(RED, BLACK, "disk init \n");
+	disk_init();
 
 	Local_APIC_init();
 	color_printk(RED, BLACK, "ICR init\n");
