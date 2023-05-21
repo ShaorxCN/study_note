@@ -9,6 +9,7 @@ struct time
     int month;  // 08
     int year;   // 32+09
 };
+struct time time;
 
 int get_cmos_time(struct time *time);
 #endif

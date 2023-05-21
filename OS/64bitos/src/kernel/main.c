@@ -14,6 +14,8 @@
 #include "mouse.h"
 #include "disk.h"
 #include "SMP.h"
+#include "HPET.h"
+
 #else
 #include "8259A.h"
 #endif
@@ -194,10 +196,9 @@ void Start_Kernel(void)
 #else
 	init_8259A();
 #endif
-	struct time time;
-	get_cmos_time(&time);
-	color_printk(RED, BLACK, "year:%#010x,month:%#010x,day:%#010x,hour:%#010x,mintue:%#010x,second:%#010x\n", time.year, time.month, time.day, time.hour, time.minute, time.second);
 
+	color_printk(RED, BLACK, "Timer & Clock init \n");
+	HPET_init();
 	// char buf[512];
 	// color_printk(PURPLE, BLACK, "disk write:\n");
 	// memset(buf, 0x44, 512);
