@@ -3,6 +3,8 @@
 #include "interrupt.h"
 #include "printk.h"
 #include "time.h"
+#include "softirq.h"
+#include "timer.h"
 extern struct time time;
 
 hw_int_controller HPET_int_controller =
@@ -16,7 +18,9 @@ hw_int_controller HPET_int_controller =
 
 void HPET_handler(unsigned long nr, unsigned long parameter, struct pt_regs *regs)
 {
-    color_printk(RED, WHITE, "(HPET)");
+    jiffies++;
+
+    set_softirq_status(TIMER_SIRQ);
 }
 
 void HPET_init()
@@ -45,10 +49,6 @@ void HPET_init()
 
     color_printk(RED, BLACK, "HPET - GCAP_ID:<%#018lx>\n", *(unsigned long *)HPET_addr);
 
-    // gen_conf 设置3 使能置位+旧设备兼容标志位置位 即time0 向ioapic IRQ2
-    *(unsigned long *)(HPET_addr + 0x10) = 3;
-    io_mfence();
-
     // time0 conf   edge triggered & 周期性触发(触发中断后comp会自增一开始的目标值) IRQ2
     *(unsigned long *)(HPET_addr + 0x100) = 0x004c;
     io_mfence();
@@ -60,8 +60,12 @@ void HPET_init()
 
     // init MAIN_CNT & get CMOS time
     get_cmos_time(&time);
-    *(unsigned long *)(HPET_addr + 0xf0) = 0; // 这边写入开始计数
+    *(unsigned long *)(HPET_addr + 0xf0) = 0;
     io_mfence();
 
     color_printk(RED, BLACK, "year%#010x,month:%#010x,day:%#010x,hour:%#010x,mintue:%#010x,second:%#010x\n", time.year, time.month, time.day, time.hour, time.minute, time.second);
+
+    // gen_conf 设置3 使能置位+旧设备兼容标志位置位 即time0 向ioapic IRQ2
+    *(unsigned long *)(HPET_addr + 0x10) = 3;
+    io_mfence();
 }

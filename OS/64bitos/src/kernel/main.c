@@ -7,6 +7,8 @@
 #include "task.h"
 #include "cpu.h"
 #include "time.h"
+#include "timer.h"
+#include "softirq.h"
 
 #if APIC
 #include "APIC.h"
@@ -116,6 +118,7 @@ void Start_Kernel(void)
 	pagetable_init();
 
 	color_printk(RED, BLACK, "interrupt init \n");
+
 #if APIC
 	unsigned int *tss = NULL;
 	APIC_IOAPIC_init();
@@ -192,12 +195,14 @@ void Start_Kernel(void)
 	// wrmsr(0x830, *(unsigned long *)&icr_entry);
 	// icr_entry.vector = 0xc9;
 	// wrmsr(0x830, *(unsigned long *)&icr_entry);
-
 #else
 	init_8259A();
 #endif
+	color_printk(RED, BLACK, "Soft IRQ init \n");
+	softirq_init();
 
 	color_printk(RED, BLACK, "Timer & Clock init \n");
+	timer_init();
 	HPET_init();
 	// char buf[512];
 	// color_printk(PURPLE, BLACK, "disk write:\n");

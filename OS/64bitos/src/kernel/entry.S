@@ -57,7 +57,14 @@ RESTORE_ALL:
 ret_from_exception:
 	/*GET_CURRENT(%ebx)	need rewrite*/
 ENTRY(ret_from_intr)
+	mov  $-1,%rcx
+	testq softirq_status(%rip),%rcx              //64bit unsigned long  按位and 不等于说明置位了 触发过软中断上半部
+	jnz softirq_handler
 	jmp	RESTORE_ALL	/*need rewrite*/
+
+softirq_handler:
+	callq do_softirq
+	jmp RESTORE_ALL
 
 // 这里system_call 后面需要跟着ret_system_call 因为 call 和 ret是相对的 会返回下一条指令处也就是自动进入sysexit
 ENTRY(system_call)
