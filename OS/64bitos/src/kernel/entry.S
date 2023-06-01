@@ -48,7 +48,7 @@ RESTORE_ALL:
 	movq	%rax,	%es;	
 	popq	%rax;		
 	addq	$0x10,	%rsp;	       // 增加16B  代表弹出栈中的变量FUNC 和ERRCODE 这里保存着实际是中断处理程序的地址 所以要先弹出 方便iretq还原现场
-	iretq;
+	iretq;                        // 这里会恢复之前保存的eflags
 	
 #define GET_CURRENT(reg)	\
 	movq	$-32768,reg;	\

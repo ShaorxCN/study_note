@@ -20,7 +20,9 @@ void HPET_handler(unsigned long nr, unsigned long parameter, struct pt_regs *reg
 {
     jiffies++;
 
-    set_softirq_status(TIMER_SIRQ);
+    // 减少中断下半部的进入 只有触发任务的时候才会进入
+    if ((container_of(list_next(&timer_list_head.list), struct timer_list, list)->expire_jiffies <= jiffies))
+        set_softirq_status(TIMER_SIRQ);
 }
 
 void HPET_init()
