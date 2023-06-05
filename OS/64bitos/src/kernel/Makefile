@@ -17,11 +17,11 @@ all: system
 # 总体ld命令中式按照文件顺序一次链接的 所以head.o 需要作为第一个才能放到lds文件中指定的位置
 
 ifeq (${PIC},APIC)
-system:	head.o entry.o APU_boot.o main.o printk.o trap.o memory.o interrupt.o PIC.o task.o cpu.o keyboard.o mouse.o disk.o SMP.o time.o HPET.o softirq.o timer.o
-	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o APU_boot.o memory.o  main.o printk.o trap.o interrupt.o PIC.o task.o cpu.o keyboard.o mouse.o  disk.o SMP.o  time.o softirq.o HPET.o timer.o -T Kernel.lds 
+system:	head.o entry.o APU_boot.o main.o printk.o trap.o memory.o interrupt.o PIC.o task.o cpu.o keyboard.o mouse.o disk.o SMP.o time.o HPET.o softirq.o timer.o schedule.o
+	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o APU_boot.o memory.o  main.o printk.o trap.o interrupt.o PIC.o task.o cpu.o keyboard.o mouse.o  disk.o SMP.o  time.o softirq.o HPET.o timer.o  schedule.o -T Kernel.lds 
 else
-system:	head.o entry.o  main.o printk.o trap.o memory.o interrupt.o PIC.o task.o cpu.o time.o HPET.o softirq.o timer.o
-	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o  main.o printk.o trap.o interrupt.o PIC.o task.o cpu.o time.o  HPET.o softirq.o timer.o -T Kernel.lds 
+system:	head.o entry.o  main.o printk.o trap.o memory.o interrupt.o PIC.o task.o cpu.o time.o HPET.o softirq.o timer.o schedule.o
+	ld -b elf64-x86-64 -z muldefs -o system head.o entry.o memory.o  main.o printk.o trap.o interrupt.o PIC.o task.o cpu.o time.o  HPET.o softirq.o timer.o  schedule.o -T Kernel.lds 
 endif
 head.o:	head.S
 # -E表示仅预处理 不执行编译汇编或者链接 预处理 编译生成汇编代码一类  汇编生成obj
@@ -77,5 +77,7 @@ softirq.o: softirq.c
 	gcc  $(CFLAGS) -c softirq.c
 timer.o: timer.c
 	gcc  $(CFLAGS) -c timer.c
+schedule.o: schedule.c
+	gcc  $(CFLAGS) -c schedule.c
 clean:
 	rm -rf *.o *.s~ *.s *.S~ *.c~ *.h~ system  Makefile~ Kernel.lds~ kernel.bin 

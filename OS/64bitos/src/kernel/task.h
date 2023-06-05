@@ -67,27 +67,30 @@ struct thread_struct
 };
 
 // 内核线程(核心进程)
-#define PF_KTHREAD (1 << 0)
+#define PF_KTHREAD (1ul << 0)
+#define NEED_SCHEDULE（1ul << 1） // flag 是否可被调度  bit
 
-// pcb
+// pcb 成员位置不要动 entry.S中使用了offset来访问成员
 struct task_struct
 {
-    struct List list;    // 双向链表 连接各进程pcb
     volatile long state; // 记录任务状态 运行态 停止态 可中断态  volatile 说明不要优化 每次使用重新读取 不要使用寄存器中的备份值
     unsigned long flags; // 任务标志:进程 线程 内核线程
+    long signal;         // 进程持有的信号
 
     struct mm_struct *mm;         // 内存空间结构体 包含页表和程序段信息
     struct thread_struct *thread; // 进程切换时保留的状态信息 比如rsp0 ip等
+    struct List list;             // 双向链表 连接各进程pcb
     /*
     0x0000,0000,0000,0000 - 0x0000,7fff,ffff,ffff user
     0xffff,8000,0000,0000 - 0xffff,ffff,ffff,ffff kernel 高位作为内核
     e */
     unsigned long addr_limit; // 进程空间地址范围
 
-    long pid;      // 进程pid
-    long counter;  // 进程可用时间片
-    long signal;   // 进程持有的信号
-    long priority; // 进程优先级
+    long pid; // 进程pid
+    // long counter;  // 进程可用时间片
+
+    long priority;  // 进程优先级
+    long vrun_time; // 进程运行的虚拟运行时间
 };
 
 // 内核为每个进程创建的管理  和内核栈一体 低位放task_struct 高地址则作为内核层栈空间使用
@@ -102,7 +105,7 @@ struct mm_struct init_mm;
 // 定义第一个进程
 struct thread_struct init_thread;
 
-// 定义第一个进程初始化 实际应该是ldle?
+// 定义第一个进程初始化 实际应该是idle
 #define INIT_TASK(tsk)                    \
     {                                     \
         .state = TASK_UNINTERRUPTIBLE,    \
@@ -111,7 +114,7 @@ struct thread_struct init_thread;
         .thread = &init_thread,           \
         .addr_limit = 0xffff800000000000, \
         .pid = 0,                         \
-        .counter = 1,                     \
+        .vrun_time = 0,                   \
         .signal = 0,                      \
         .priority = 0                     \
     }
@@ -222,25 +225,23 @@ void task_init();
 
 #define MAX_SYSTEM_CALL_NR 128
 
-typedef unsigned long (* system_call_t)(struct pt_regs * regs);
-unsigned long no_system_call(struct pt_regs * regs)
+typedef unsigned long (*system_call_t)(struct pt_regs *regs);
+unsigned long no_system_call(struct pt_regs *regs)
 {
-    color_printk(RED,BLACK,"no_system_call is calling,NR:%#04x\n",regs->rax);
-	return -1;
+    color_printk(RED, BLACK, "no_system_call is calling,NR:%#04x\n", regs->rax);
+    return -1;
 }
 
-unsigned long sys_printf(struct pt_regs * regs)
+unsigned long sys_printf(struct pt_regs *regs)
 {
-    color_printk(BLACK,WHITE,(char *) regs->rdi);
+    color_printk(BLACK, WHITE, (char *)regs->rdi);
     return 1;
 }
 
-
-system_call_t system_call_table[MAX_SYSTEM_CALL_NR] = 
-{
-	[0] = no_system_call,
-	[1] = sys_printf,
-	[2 ... MAX_SYSTEM_CALL_NR-1] = no_system_call
-};
+system_call_t system_call_table[MAX_SYSTEM_CALL_NR] =
+    {
+        [0] = no_system_call,
+        [1] = sys_printf,
+        [2 ... MAX_SYSTEM_CALL_NR - 1] = no_system_call};
 
 #endif

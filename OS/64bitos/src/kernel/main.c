@@ -198,6 +198,10 @@ void Start_Kernel(void)
 #else
 	init_8259A();
 #endif
+
+	color_printk(RED, BLACK, "schedule init \n");
+	schedule_init();
+
 	color_printk(RED, BLACK, "Soft IRQ init \n");
 	softirq_init();
 
@@ -218,8 +222,8 @@ void Start_Kernel(void)
 	// for (i = 0; i < 512; i++)
 	// 	color_printk(BLACK, WHITE, "%02x", buf[i]);
 	// color_printk(PURPLE, BLACK, "\ndisk read end\n");
-	// color_printk(RED, BLACK, "task_init \n");
-	// task_init();
+	color_printk(RED, BLACK, "task_init \n");
+	task_init();
 
 #if APIC
 	while (1)

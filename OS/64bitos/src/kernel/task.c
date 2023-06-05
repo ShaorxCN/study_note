@@ -5,6 +5,7 @@
 #include "printk.h"
 #include "linkage.h"
 #include "gate.h"
+#include "schedule.h"
 
 extern void ret_system_call(void);
 extern void system_call(void);
@@ -46,6 +47,12 @@ void user_level_function()
 
 unsigned long do_execve(struct pt_regs *regs)
 {
+
+    unsigned long addr = 0x800000;
+    unsigned long *tmp;
+    unsigned long *virtual = NULL;
+    struct Page *p = NULL;
+
     regs->rdx = 0x800000; // RIP  这里等同 0xffff800000800000 高到低的index时 0 0 4 +offset 找到对应的 改为dpl 3 也就是那些都改为7结尾的了
     regs->rcx = 0xa00000; // RSP   这俩地址只要是未使用的即可 但是保证在同一物理页 2m rsp值栈顶
     regs->rax = 1;
@@ -53,12 +60,33 @@ unsigned long do_execve(struct pt_regs *regs)
     regs->es = 0;
     color_printk(RED, BLACK, "do_execve task is running\n");
 
+    // 分配应用层空间
+    Global_CR3 = Get_gdt();
+
+    tmp = Phy_To_Virt((unsigned long *)((unsigned long)Global_CR3 & (~0xfffUL)) + ((addr >> PAGE_GDT_SHIFT) & 0x1ff));
+
+    virtual = kmalloc(PAGE_4K_SIZE, 0);
+    set_mpl4t(tmp, mk_mpl4t(Virt_To_Phy(virtual), PAGE_USER_GDT));
+
+    tmp = Phy_To_Virt((unsigned long *)(*tmp & (~0xfffUL)) + ((addr >> PAGE_1G_SHIFT) & 0x1ff));
+    virtual = kmalloc(PAGE_4K_SIZE, 0);
+    set_pdpt(tmp, mk_pdpt(Virt_To_Phy(virtual), PAGE_USER_Dir));
+
+    tmp = Phy_To_Virt((unsigned long *)(*tmp & (~0xfffUL)) + ((addr >> PAGE_2M_SHIFT) & 0x1ff));
+    p = alloc_pages(ZONE_NORMAL, 1, PG_PTable_Maped);
+    set_pdt(tmp, mk_pdt(p->PHY_address, PAGE_USER_Page));
+
+    flush_tlb();
+
+    if (!(current->flags & PF_KTHREAD))
+        current->addr_limit = 0xffff800000000000;
+
     memcpy(user_level_function, (void *)0x800000, 1024);
 
-    return 0;
+    return 1;
 }
 
-// init进程创建函数
+// init[1]进程创建函数
 unsigned long init(unsigned long arg)
 {
     struct pt_regs *regs;
@@ -66,6 +94,7 @@ unsigned long init(unsigned long arg)
 
     current->thread->rip = (unsigned long)ret_system_call;
     current->thread->rsp = (unsigned long)current + STACK_SIZE - sizeof(struct pt_regs);
+    current->flags = 0;
     regs = (struct pt_regs *)current->thread->rsp;
 
     // 扩展init线程 使其成为进程 regs作为参数传递
@@ -100,9 +129,11 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
     list_init(&tsk->list);
     list_add_to_before(&init_task_union.task.list, &tsk->list);
     tsk->pid++;
+    tsk->priority = 2;
     tsk->state = TASK_UNINTERRUPTIBLE;
     // 新开页中往下 开辟给thd
     thd = (struct thread_struct *)(tsk + 1);
+    memset(thd, 0, sizeof(*thd));
     tsk->thread = thd;
 
     // 手动入栈pt_regs 模拟现场
@@ -120,8 +151,9 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
         thd->rip = regs->rip = (unsigned long)ret_system_call;
 
     tsk->state = TASK_RUNNING;
+    insert_task_queue(tsk);
 
-    return 0;
+    return 1;
 }
 
 unsigned long do_exit(unsigned long code)
@@ -223,7 +255,7 @@ void task_init()
     struct task_struct *p = NULL;
     init_mm.pgd = (pml4t_t *)Global_CR3;
 
-    // 这里 ldle进程是一直再内核空间的 所以mm_struct 纪录的不是应用程序信息 而是内核程序的各个段信息以及内核层栈基地址
+    // 这里 idle进程是一直再内核空间的 所以mm_struct 纪录的不是应用程序信息 而是内核程序的各个段信息以及内核层栈基地址
     // _stack_start 从head.S中标记
     init_mm.start_code = memory_management_struct.start_code;
     init_mm.end_code = memory_management_struct.end_code;
@@ -258,8 +290,8 @@ void task_init()
 
     init_task_union.task.state = TASK_RUNNING;
 
-    // 获取到init内核线程的thd 然后切换
-    p = container_of(list_next(&current->list), struct task_struct, list);
+    // 从队列中找到init  然后切换
+    p = container_of(list_next(&task_schedule.task_queue.list), struct task_struct, list);
 
     switch_to(current, p);
 }

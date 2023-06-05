@@ -23,6 +23,24 @@ void HPET_handler(unsigned long nr, unsigned long parameter, struct pt_regs *reg
     // 减少中断下半部的进入 只有触发任务的时候才会进入
     if ((container_of(list_next(&timer_list_head.list), struct timer_list, list)->expire_jiffies <= jiffies))
         set_softirq_status(TIMER_SIRQ);
+
+    switch (current->priority)
+    {
+    case 0:
+    case 1:
+        task_schedule.CPU_exec_task_jiffies--;
+        current->vrun_time += 1;
+        break;
+    case 2:
+    default:
+        task_schedule.CPU_exec_task_jiffies -= 2;
+        current->vrun_time += 2;
+        break;
+    }
+
+    // 时间片耗尽则当前进程可以被调度
+    if (task_schedule.CPU_exec_task_jiffies <= 0)
+        current->flags |= NEED_SCHEDULE;
 }
 
 void HPET_init()

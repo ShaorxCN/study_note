@@ -26,6 +26,10 @@ RFLAGS =    0xa8
 OLDRSP =    0xb0
 OLDSS  =    0xb8
 
+// task_struct中成员的offset
+TSK_STATE	=	0x00
+TSK_FLAGS	=	0x08
+TSK_SINGAL	=	0x10
 // 恢复中断
 RESTORE_ALL:
 	popq	%r15;		
@@ -60,11 +64,24 @@ ENTRY(ret_from_intr)
 	mov  $-1,%rcx
 	testq softirq_status(%rip),%rcx              //64bit unsigned long  按位and 不等于说明置位了 触发过软中断上半部
 	jnz softirq_handler
+	GET_CURRENT(%rbx)                             // 获取当前pcb
+	movq TSK_FLAGS(%rbx),%rcx
+	test $2,%rcx
+	jnz reschedule
 	jmp	RESTORE_ALL	/*need rewrite*/
 
 softirq_handler:
 	callq do_softirq
+	GET_CURRENT(%rbx)
+	movq TSK_FLAGS(%rbx),%rcx
+	test $2,%rcx
+	jnz reschedule
 	jmp RESTORE_ALL
+
+reschedule:
+	callq schedule
+	jmp RESTORE_ALL
+
 
 // 这里system_call 后面需要跟着ret_system_call 因为 call 和 ret是相对的 会返回下一条指令处也就是自动进入sysexit
 ENTRY(system_call)
