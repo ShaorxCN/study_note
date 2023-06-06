@@ -4,6 +4,7 @@
 #include "cpu.h"
 #include "gate.h"
 #include "interrupt.h"
+#include "task.h"
 void SMP_init()
 {
     int i;
@@ -78,7 +79,7 @@ void Start_SMP()
                          : "memory");
 
     color_printk(RED, YELLOW, "x2APIC ID:%#010x\n", x);
-
+    memset(current, 0, sizeof(struct task_struct)); // 清空pcb
     load_TR(10 + (global_i - 1) * 2);
     spin_unlock(&SMP_lock);
 

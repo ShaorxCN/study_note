@@ -6,6 +6,7 @@
 #include "linkage.h"
 #include "gate.h"
 #include "schedule.h"
+#include "task.h"
 
 extern void ret_system_call(void);
 extern void system_call(void);
@@ -245,8 +246,13 @@ void __switch_to(struct task_struct *prev, struct task_struct *next)
     __asm__ __volatile__("movq	%0,	%%fs \n\t" ::"a"(next->thread->fs));
     __asm__ __volatile__("movq	%0,	%%gs \n\t" ::"a"(next->thread->gs));
 
-    color_printk(WHITE, BLACK, "prev->thread->rsp0:%#018lx\n", prev->thread->rsp0);
-    color_printk(WHITE, BLACK, "next->thread->rsp0:%#018lx\n", next->thread->rsp0);
+    // 指定目标内核层的栈顶地址
+    wrmsr(0x175, next->thread->rsp0);
+
+    color_printk(WHITE, BLACK, "prev->thread->rsp0:%#018lx\t", prev->thread->rsp0);
+    color_printk(WHITE, BLACK, "prev->thread->rsp :%#018lx\n", prev->thread->rsp);
+    color_printk(WHITE, BLACK, "next->thread->rsp0:%#018lx\t", next->thread->rsp0);
+    color_printk(WHITE, BLACK, "next->thread->rsp :%#018lx\n", next->thread->rsp);
 }
 
 // 完善第一个进程并且切换到
@@ -290,8 +296,8 @@ void task_init()
 
     init_task_union.task.state = TASK_RUNNING;
 
-    // 从队列中找到init  然后切换
-    p = container_of(list_next(&task_schedule.task_queue.list), struct task_struct, list);
+    // 从队列中找到init  然后切换 注释掉 改为调度器调度 上面代码已经insert queue
+    // p = container_of(list_next(&task_schedule.task_queue.list), struct task_struct, list);
 
-    switch_to(current, p);
+    // switch_to(current, p);
 }

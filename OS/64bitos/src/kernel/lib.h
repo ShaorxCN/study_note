@@ -258,4 +258,15 @@ static inline unsigned long rdmsr(unsigned long address)
 	return (unsigned long)tmp0 << 32 | tmp1;
 }
 
+// pushfq 压入eflags
+static inline unsigned long get_rflags()
+{
+	unsigned long tmp = 0;
+	__asm__ __volatile__("pushfq	\n\t"
+						 "movq	(%%rsp), %0	\n\t"
+						 "popfq	\n\t"
+						 : "=r"(tmp)::"memory");
+	return tmp;
+}
+
 #endif

@@ -11,7 +11,7 @@
 // 所以这边乘以的是0x100 后面有有转换函数
 int get_cmos_time(struct time *time)
 {
-    cli();
+    // cli();
     do
     {
         time->year = CMOS_READ(0x09) + CMOS_READ(0x32) * 0x100;
@@ -23,5 +23,5 @@ int get_cmos_time(struct time *time)
 
     } while (time->second != CMOS_READ(0x00));
     io_out8(0x70, 0x00);
-    sti();
+    // sti();
 }

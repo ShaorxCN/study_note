@@ -68,7 +68,7 @@ struct thread_struct
 
 // 内核线程(核心进程)
 #define PF_KTHREAD (1ul << 0)
-#define NEED_SCHEDULE（1ul << 1） // flag 是否可被调度  bit
+#define NEED_SCHEDULE (1ul << 1) // flag 是否可被调度  bit
 
 // pcb 成员位置不要动 entry.S中使用了offset来访问成员
 struct task_struct
@@ -140,7 +140,7 @@ struct thread_struct init_thread =
         .error_code = 0};
 
 // tss 结构 保存切换shi
-// rsp0-2分别是0环 1环 2环 的默认栈指针 3环是用户层 每次3环进0环的rsp3是随机  IST是特殊栈指针 给中断有关
+// rsp0-2分别是0环 1环 2环 的默认栈指针 3环是用户层 每次3环进0环的rsp3是随机  IST是特殊栈指针 和中断有关
 struct tss_struct
 {
     unsigned int reserved0;

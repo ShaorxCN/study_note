@@ -355,8 +355,8 @@ void APIC_IOAPIC_init()
     // io_mfence();
 
     memset(interrupt_desc, 0, sizeof(irq_desc_T) * NR_IRQS);
-    // open IF eflages
-    sti();
+    // open IF eflages 移到init创建前 减少多核日志杂乱
+    // sti();
 }
 
 void do_IRQ(struct pt_regs *regs, unsigned long nr) // regs:rsp,nr

@@ -5,6 +5,8 @@
 #include "time.h"
 #include "softirq.h"
 #include "timer.h"
+#include "task.h"
+#include "schedule.h"
 extern struct time time;
 
 hw_int_controller HPET_int_controller =

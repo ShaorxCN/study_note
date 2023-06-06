@@ -9,6 +9,7 @@
 #include "time.h"
 #include "timer.h"
 #include "softirq.h"
+#include "schedule.h"
 
 #if APIC
 #include "APIC.h"
@@ -208,6 +209,7 @@ void Start_Kernel(void)
 	color_printk(RED, BLACK, "Timer & Clock init \n");
 	timer_init();
 	HPET_init();
+	sti();
 	// char buf[512];
 	// color_printk(PURPLE, BLACK, "disk write:\n");
 	// memset(buf, 0x44, 512);

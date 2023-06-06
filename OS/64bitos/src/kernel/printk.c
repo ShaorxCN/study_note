@@ -359,7 +359,11 @@ int color_printk(unsigned int FRcolor, unsigned int BKcolor, const char *fmt, ..
 	int line = 0;
 	va_list args;
 
-	spin_lock(&Pos.printk_lock);
+	// 0x200UL 是IF位置 bit9 说明不是中断进来的 正常锁 这样中断进来的不会竞争
+	if (get_rflags() & 0x200UL)
+	{
+		spin_lock(&Pos.printk_lock);
+	}
 
 	va_start(args, fmt);
 
@@ -420,6 +424,10 @@ int color_printk(unsigned int FRcolor, unsigned int BKcolor, const char *fmt, ..
 		}
 	}
 
-	spin_unlock(&Pos.printk_lock);
+	if (get_rflags() & 0x200UL)
+	{
+		spin_unlock(&Pos.printk_lock);
+	}
+
 	return i;
 }
