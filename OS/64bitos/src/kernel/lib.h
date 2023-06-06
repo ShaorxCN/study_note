@@ -50,7 +50,7 @@ static inline void list_add_to_behind(struct List *entry, struct List *add) ////
 }
 
 // add加到entry前面
-static inline void list_add_to_before(struct List *entry, struct List *add) ////add to entry behind
+static inline void list_add_to_before(struct List *entry, struct List *add) ////add to entry before
 {
 	add->next = entry;
 	entry->prev->next = add;

@@ -74,7 +74,8 @@ struct thread_struct
 struct task_struct
 {
     volatile long state; // 记录任务状态 运行态 停止态 可中断态  volatile 说明不要优化 每次使用重新读取 不要使用寄存器中的备份值
-    unsigned long flags; // 任务标志:进程 线程 内核线程
+    unsigned long flags; // 见上面的define PF_KTHREAD等
+    long preempt_count;  // 持有自旋锁的数量
     long signal;         // 进程持有的信号
 
     struct mm_struct *mm;         // 内存空间结构体 包含页表和程序段信息
@@ -226,22 +227,14 @@ void task_init();
 #define MAX_SYSTEM_CALL_NR 128
 
 typedef unsigned long (*system_call_t)(struct pt_regs *regs);
-unsigned long no_system_call(struct pt_regs *regs)
-{
-    color_printk(RED, BLACK, "no_system_call is calling,NR:%#04x\n", regs->rax);
-    return -1;
-}
 
-unsigned long sys_printf(struct pt_regs *regs)
-{
-    color_printk(BLACK, WHITE, (char *)regs->rdi);
-    return 1;
-}
+unsigned long no_system_call(struct pt_regs *regs);
 
-system_call_t system_call_table[MAX_SYSTEM_CALL_NR] =
-    {
-        [0] = no_system_call,
-        [1] = sys_printf,
-        [2 ... MAX_SYSTEM_CALL_NR - 1] = no_system_call};
+unsigned long sys_printf(struct pt_regs *regs);
+
+extern void ret_system_call(void);
+extern void system_call(void);
+
+extern system_call_t system_call_table[MAX_SYSTEM_CALL_NR];
 
 #endif

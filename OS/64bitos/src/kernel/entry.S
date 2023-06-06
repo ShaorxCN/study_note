@@ -29,7 +29,8 @@ OLDSS  =    0xb8
 // task_struct中成员的offset
 TSK_STATE	=	0x00
 TSK_FLAGS	=	0x08
-TSK_SINGAL	=	0x10
+TSK_PREEMPT	=	0x10
+TSK_SIGNAL	=	0x18
 // 恢复中断
 RESTORE_ALL:
 	popq	%r15;		
@@ -65,14 +66,20 @@ ENTRY(ret_from_intr)
 	testq softirq_status(%rip),%rcx              //64bit unsigned long  按位and 不等于说明置位了 触发过软中断上半部
 	jnz softirq_handler
 	GET_CURRENT(%rbx)                             // 获取当前pcb
+	movq TSK_PREEMPT(%rbx),%rcx   // 检查自旋锁的数量 为0说明开启可以抢占 不然需要释放锁后才能抢占 这边为不为0就直接返回 不参与调度
+	cmpq $0,%rcx
+	jne RESTORE_ALL
 	movq TSK_FLAGS(%rbx),%rcx
 	test $2,%rcx
 	jnz reschedule
-	jmp	RESTORE_ALL	/*need rewrite*/
+	jmp	RESTORE_ALL	
 
 softirq_handler:
 	callq do_softirq
 	GET_CURRENT(%rbx)
+	movq TSK_PREEMPT(%rbx),%rcx   
+	cmpq $0,%rcx
+	jne RESTORE_ALL
 	movq TSK_FLAGS(%rbx),%rcx
 	test $2,%rcx
 	jnz reschedule

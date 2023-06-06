@@ -1,5 +1,6 @@
 #include "lib.h"
 #include "memory.h"
+#include "printk.h"
 
 // 这里做页属性赋值
 // 简化逻辑 使之更加独立

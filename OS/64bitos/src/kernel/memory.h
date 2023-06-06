@@ -1,7 +1,6 @@
 #ifndef __MEMORY_H__
 #define __MEMORY_H__
 
-#include "printk.h"
 #include "lib.h"
 
 //	8Bytes per cell 表项个数

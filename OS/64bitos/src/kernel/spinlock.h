@@ -1,5 +1,8 @@
 #ifndef __SPINLOCK_H__
 #define __SPINLOCK_H__
+
+#include "preempt.h"
+
 // 自旋锁类型
 typedef struct
 {
@@ -15,6 +18,7 @@ static inline void spin_init(spinlock_T *lock)
 // pause 空转指令 周期数不一定 主要是降低功耗以及可能得效率 2中比较0和lock得值 如果没有解锁则继续2 否则到1开始上锁
 static inline void spin_lock(spinlock_T *lock)
 {
+    preempt_disable();
     __asm__ __volatile__("1:\n\t"
                          "lock decq %0 \n\t"
                          "jns 3f \n\t"
@@ -35,6 +39,21 @@ static inline void spin_unlock(spinlock_T *lock)
                          : "=m"(lock->lock)
                          :
                          : "memory");
+    preempt_enable();
+}
+
+// 尝试锁 这边尝试交换数值 然后检查 如果不是0那么就是没锁上 那就还是抢占enable
+static inline long spin_trylock(spinlock_T *lock)
+{
+    unsigned long tmp_value = 0;
+    preempt_disable();
+    __asm__ __volatile__("xchgq	%0,	%1	\n\t"
+                         : "=q"(tmp_value), "=m"(lock->lock)
+                         : "0"(0)
+                         : "memory");
+    if (!tmp_value)
+        preempt_enable();
+    return tmp_value;
 }
 
 #endif
