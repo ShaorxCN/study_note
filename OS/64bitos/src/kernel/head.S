@@ -96,7 +96,7 @@ rp_sidt:
 
 // 初始化TSS结构 这里因为本身就是0特权级 不会产生切换。这里直接ltr装载了
 setup_TSS64:
-	leaq	TSS64_Table(%rip),	%rdx
+	leaq	init_tss(%rip),	%rdx
 	xorq	%rax,	%rax
 	xorq	%rcx,	%rcx
 	movq	$0x89,	%rax
@@ -328,12 +328,12 @@ IDT_BASE:     .quad    IDT_Table
 
 //=======     TSS64_Table
 
-.globl        TSS64_Table
+// .globl        TSS64_Table
 
-TSS64_Table:
-    .fill 13,8,0
-TSS64_END:
+// TSS64_Table:
+//     .fill 13,8,0
+// TSS64_END:
 
-TSS64_POINTER:
-TSS64_LIMIT:    .word    TSS64_END - TSS64_Table - 1
-TSS64_BASE:     .quad    TSS64_Table
+// TSS64_POINTER:
+// TSS64_LIMIT:    .word    TSS64_END - TSS64_Table - 1
+// TSS64_BASE:     .quad    TSS64_Table

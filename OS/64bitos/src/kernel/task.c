@@ -7,6 +7,7 @@
 #include "gate.h"
 #include "schedule.h"
 #include "task.h"
+#include "SMP.h"
 
 extern void ret_system_call(void);
 extern void system_call(void);
@@ -149,6 +150,8 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
     tsk->pid++;
     tsk->priority = 2;
     tsk->state = TASK_UNINTERRUPTIBLE;
+    tsk->cpu_id = SMP_cpu_id();
+    tsk->preempt_count = 0;
     // 新开页中往下 开辟给thd
     thd = (struct thread_struct *)(tsk + 1);
     memset(thd, 0, sizeof(*thd));
@@ -251,10 +254,12 @@ int kernel_thread(unsigned long (*fn)(unsigned long), unsigned long arg, unsigne
 // retq 返回到 next-->rip
 void __switch_to(struct task_struct *prev, struct task_struct *next)
 {
+    unsigned int color = 0;
+    init_tss[SMP_cpu_id()].rsp0 = next->thread->rsp0;
     // 保存0环栈指针
-    init_tss[0].rsp0 = next->thread->rsp0;
+    // init_tss[0].rsp0 = next->thread->rsp0;
 
-    set_tss64(TSS64_Table, init_tss[0].rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
+    // set_tss64(TSS64_Table, init_tss[0].rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
     __asm__ __volatile__("movq	%%fs,	%0 \n\t"
                          : "=a"(prev->thread->fs));
     __asm__ __volatile__("movq	%%gs,	%0 \n\t"
@@ -265,11 +270,15 @@ void __switch_to(struct task_struct *prev, struct task_struct *next)
 
     // 指定目标内核层的栈顶地址
     wrmsr(0x175, next->thread->rsp0);
-
-    color_printk(WHITE, BLACK, "prev->thread->rsp0:%#018lx\t", prev->thread->rsp0);
-    color_printk(WHITE, BLACK, "prev->thread->rsp :%#018lx\n", prev->thread->rsp);
-    color_printk(WHITE, BLACK, "next->thread->rsp0:%#018lx\t", next->thread->rsp0);
-    color_printk(WHITE, BLACK, "next->thread->rsp :%#018lx\n", next->thread->rsp);
+    if (SMP_cpu_id() == 0)
+        color = WHITE;
+    else
+        color = YELLOW;
+    color_printk(color, BLACK, "prev->thread->rsp0:%#018lx\t", prev->thread->rsp0);
+    color_printk(color, BLACK, "prev->thread->rsp :%#018lx\n", prev->thread->rsp);
+    color_printk(color, BLACK, "next->thread->rsp0:%#018lx\t", next->thread->rsp0);
+    color_printk(color, BLACK, "next->thread->rsp :%#018lx\n", next->thread->rsp);
+    color_printk(color, BLACK, "CPUID:%#018lx\n", SMP_cpu_id());
 }
 
 // 完善第一个进程并且切换到
@@ -301,9 +310,9 @@ void task_init()
     wrmsr(0x175, current->thread->rsp0);      // 指定内核栈指针
     wrmsr(0x176, (unsigned long)system_call); // 指定rip 进入entry.S
     // 初始化 init_thread 和tss
-    set_tss64(TSS64_Table, init_thread.rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
-
-    init_tss[0].rsp0 = init_thread.rsp0;
+    // set_tss64(TSS64_Table, init_thread.rsp0, init_tss[0].rsp1, init_tss[0].rsp2, init_tss[0].ist1, init_tss[0].ist2, init_tss[0].ist3, init_tss[0].ist4, init_tss[0].ist5, init_tss[0].ist6, init_tss[0].ist7);
+    // init_tss[0].rsp0 = init_thread.rsp0;
+    init_tss[SMP_cpu_id()].rsp0 = init_thread.rsp0;
 
     // 创建初始化thread_list
     list_init(&init_task_union.task.list);

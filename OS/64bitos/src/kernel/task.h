@@ -77,6 +77,7 @@ struct task_struct
     unsigned long flags; // 见上面的define PF_KTHREAD等
     long preempt_count;  // 持有自旋锁的数量
     long signal;         // 进程持有的信号
+    long cpu_id;
 
     struct mm_struct *mm;         // 内存空间结构体 包含页表和程序段信息
     struct thread_struct *thread; // 进程切换时保留的状态信息 比如rsp0 ip等
@@ -117,6 +118,7 @@ struct thread_struct init_thread;
         .pid = 0,                         \
         .vrun_time = 0,                   \
         .signal = 0,                      \
+        .cpu_id = 0,                      \
         .priority = 0                     \
     }
 
@@ -201,7 +203,10 @@ static inline struct task_struct *get_current()
     "andq	$-32768,%rbx	\n\t"
 
 // 进程切换函数  首先保存prev的rsp和rip 然后将next的rsp值存放到rsp寄存器中 此时将next 的rip压栈 这时候通过ret指令弹栈进入next模块
-// 参数传递 rdi rsi
+// 在调用__switch_to函数时，会将RDI和RSI寄存器的值作为参数传递给__switch_to函数。 也就是"D" 和 "S"
+// 函数调用call 会入栈调用处rip+1 的值  然后函数编译结尾都是retq 这边虽然jmp 但是还是通过出栈恢复
+// 也就是手动入栈的1处 然后这边执行完成还是再次retq到之前的地方。
+// 这边直接手动切换的话自然是直接执行下去 如果是schedule切换 因为中断返回restore all  还是恢复 只要rsp 确定
 #define switch_to(prev, next)                                                                       \
     do                                                                                              \
     {                                                                                               \

@@ -33,6 +33,9 @@ struct Global_Memory_Descriptor memory_management_struct = {{0}, 0};
 int global_i = 0;
 void Start_Kernel(void)
 {
+
+	unsigned char *ptr = NULL;
+
 	// header.S 中将帧缓存的物理地址(0xe0000000) 映射到0xffff800000a00000和0xa00000处
 	// loader设置了显示模式(（模式号：0x180、分辨率：1440×900、颜色深度：32 bit）)
 	// Loader引导加载程序设置的显示模式可支持32位颜色深度的像素点，其中0~7位代表蓝颜色(0x000000ff）)，8~15位代表绿颜色(0x0000ff00)，16~23位代表红颜色(0x00ff0000)，白色(0x00ffffff) 24~31位是保留位。
@@ -94,7 +97,7 @@ void Start_Kernel(void)
 	spin_init(&Pos.printk_lock);
 
 	load_TR(10);
-	set_tss64(TSS64_Table, _stack_start, _stack_start, _stack_start,
+	set_tss64((unsigned int *)&init_tss[0], _stack_start, _stack_start, _stack_start,
 			  0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00, 0xffff800000007c00);
 
 	sys_vector_init();
@@ -110,6 +113,17 @@ void Start_Kernel(void)
 
 	color_printk(RED, BLACK, "slab init \n");
 	slab_init();
+
+	ptr = (unsigned char *)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
+	((struct task_struct *)(ptr - STACK_SIZE))->cpu_id = 0;
+
+	init_tss[0].ist1 = (unsigned long)ptr;
+	init_tss[0].ist2 = (unsigned long)ptr;
+	init_tss[0].ist3 = (unsigned long)ptr;
+	init_tss[0].ist4 = (unsigned long)ptr;
+	init_tss[0].ist5 = (unsigned long)ptr;
+	init_tss[0].ist6 = (unsigned long)ptr;
+	init_tss[0].ist7 = (unsigned long)ptr;
 
 	color_printk(RED, BLACK, "frame buffer init \n");
 	frame_buffer_init();
@@ -177,10 +191,36 @@ void Start_Kernel(void)
 	{
 		spin_lock(&SMP_lock);
 
-		_stack_start = (unsigned long)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
-		tss = (unsigned int *)kmalloc(128, 0);
-		set_tss_descriptor(10 + global_i * 2, tss);
-		set_tss64(tss, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start);
+		// _stack_start = (unsigned long)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
+		// tss = (unsigned int *)kmalloc(128, 0);
+		// set_tss_descriptor(10 + global_i * 2, tss);
+		// set_tss64(tss, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start);
+
+		// 为apu 的idle分配内核栈顶
+		ptr = (unsigned char *)kmalloc(STACK_SIZE, 0);
+		_stack_start = (unsigned long)ptr + STACK_SIZE;
+		((struct task_struct *)ptr)->cpu_id = global_i; // 记录local apic id
+
+		memset(&init_tss[global_i], 0, sizeof(struct tss_struct));
+
+		init_tss[global_i].rsp0 = _stack_start;
+		init_tss[global_i].rsp1 = _stack_start;
+		init_tss[global_i].rsp2 = _stack_start;
+
+		// 分配自己的tss
+		ptr = (unsigned char *)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
+		((struct task_struct *)(ptr - STACK_SIZE))->cpu_id = global_i;
+
+		init_tss[global_i].ist1 = (unsigned long)ptr;
+		init_tss[global_i].ist2 = (unsigned long)ptr;
+		init_tss[global_i].ist3 = (unsigned long)ptr;
+		init_tss[global_i].ist4 = (unsigned long)ptr;
+		init_tss[global_i].ist5 = (unsigned long)ptr;
+		init_tss[global_i].ist6 = (unsigned long)ptr;
+		init_tss[global_i].ist7 = (unsigned long)ptr;
+
+		set_tss_descriptor(10 + global_i * 2, &init_tss[global_i]);
+
 		icr_entry.vector = 0x20;
 		icr_entry.deliver_mode = ICR_Start_up;
 		icr_entry.dest_shorthand = ICR_No_Shorthand;

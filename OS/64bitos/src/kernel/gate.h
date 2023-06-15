@@ -13,7 +13,8 @@ struct gate_struct
 
 extern struct desc_struct GDT_Table[];
 extern struct gate_struct IDT_Table[];
-extern unsigned int TSS64_Table[26];
+// 改用init_tss来为核心做配置
+// extern unsigned int TSS64_Table[26];
 
 /*
 	设置IDT
