@@ -18,8 +18,13 @@ hw_int_controller HPET_int_controller =
         .ack = IOAPIC_edge_ack,
 };
 
+unsigned char *HPET_addr = (unsigned char *)Phy_To_Virt(0xfed00000); // HPTC中00默认的选择值
+
 void HPET_handler(unsigned long nr, unsigned long parameter, struct pt_regs *regs)
 {
+
+    *(unsigned long *)(HPET_addr + 0x108) = *(unsigned long *)(HPET_addr + 0xf0) + 100000000;
+    io_mfence();
     jiffies++;
 
     // 减少中断下半部的进入 只有触发任务的时候才会进入
@@ -49,7 +54,6 @@ void HPET_init()
 {
     unsigned int *x;
     unsigned int *p;
-    unsigned char *HPET_addr = (unsigned char *)Phy_To_Virt(0xfed00000); // HPTC中00默认的选择值
 
     struct IO_APIC_RET_entry entry;
 
@@ -72,7 +76,8 @@ void HPET_init()
     color_printk(RED, BLACK, "HPET - GCAP_ID:<%#018lx>\n", *(unsigned long *)HPET_addr);
 
     // time0 conf   edge triggered & 周期性触发(触发中断后comp会自增一开始的目标值) IRQ2
-    *(unsigned long *)(HPET_addr + 0x100) = 0x004c;
+    // 这边模拟器不支持周期性 这边单次触发 然后中断里改动
+    *(unsigned long *)(HPET_addr + 0x100) |= 0x0044;
     io_mfence();
 
     // time0_comp 1S 这里基于HPET计数周期 单位fs 也就是1e-15s
@@ -88,6 +93,6 @@ void HPET_init()
     color_printk(RED, BLACK, "year%#010x,month:%#010x,day:%#010x,hour:%#010x,mintue:%#010x,second:%#010x\n", time.year, time.month, time.day, time.hour, time.minute, time.second);
 
     // gen_conf 设置3 使能置位+旧设备兼容标志位置位 即time0 向ioapic IRQ2
-    *(unsigned long *)(HPET_addr + 0x10) = 3;
+    *(unsigned long *)(HPET_addr + 0x10) |= 3;
     io_mfence();
 }
