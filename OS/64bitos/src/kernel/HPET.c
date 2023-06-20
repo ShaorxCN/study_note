@@ -7,6 +7,7 @@
 #include "timer.h"
 #include "task.h"
 #include "schedule.h"
+#include "HPET.h"
 extern struct time time;
 
 hw_int_controller HPET_int_controller =
@@ -23,7 +24,7 @@ unsigned char *HPET_addr = (unsigned char *)Phy_To_Virt(0xfed00000); // HPTC中0
 void HPET_handler(unsigned long nr, unsigned long parameter, struct pt_regs *regs)
 {
 
-    *(unsigned long *)(HPET_addr + 0x108) = *(unsigned long *)(HPET_addr + 0xf0) + 100000000;
+    *(unsigned long *)(HPET_addr + 0x108) = *(unsigned long *)(HPET_addr + 0xf0) + PERIOD;
     io_mfence();
     jiffies++;
 
@@ -73,6 +74,7 @@ void HPET_init()
 
     register_irq(34, &entry, &HPET_handler, NULL, &HPET_int_controller, "HEPT");
 
+    // 009896808086a301
     color_printk(RED, BLACK, "HPET - GCAP_ID:<%#018lx>\n", *(unsigned long *)HPET_addr);
 
     // time0 conf   edge triggered & 周期性触发(触发中断后comp会自增一开始的目标值) IRQ2
@@ -82,7 +84,8 @@ void HPET_init()
 
     // time0_comp 1S 这里基于HPET计数周期 单位fs 也就是1e-15s
     // 我这边的精度是0x989680 就是这么多fs计数器自增一次
-    *(unsigned long *)(HPET_addr + 0x108) = 100000000;
+    // 实际测试发现差了10倍?
+    *(unsigned long *)(HPET_addr + 0x108) = PERIOD;
     io_mfence();
 
     // init MAIN_CNT & get CMOS time
