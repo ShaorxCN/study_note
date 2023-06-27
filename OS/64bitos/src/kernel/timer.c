@@ -43,13 +43,15 @@ void timer_init()
     struct timer_list *tmp = NULL;
     jiffies = 0;
     init_timer(&timer_list_head, NULL, NULL, -1UL);
-    register_softirq(0, &do_timer, NULL);
+    register_softirq(0, &do_timer, NULL); // 暂时就这一个软中断
 
+    // 创建第一个定时任务
     tmp = (struct timer_list *)kmalloc(sizeof(struct timer_list), 0);
     init_timer(tmp, &test_timer, NULL, 5);
     add_timer(tmp);
 }
 
+// 检查timer队列并且执行  超时的就算了？
 void do_timer(void *data)
 {
     struct timer_list *tmp = container_of(list_next(&timer_list_head.list), struct timer_list, list);

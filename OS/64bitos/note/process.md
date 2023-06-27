@@ -285,6 +285,10 @@ bit[8]计数位宽 1是32bit 0是64bit 只有定时器0可以设置 其他固定
 
 
 
+这边关于软中断和定时任务的逻辑：
+
+首先是借助HPET的中断 然后进入后会检查`timer_list` 中是否有`expire_time` 小于计时器jiffies的 有的话则把软中断触发标志位 `softirq_status` 的bit0. 也就是定时器bit置位 这样从中断返回的时候检查标志位发现触发就进入`do_softirq` 这边一次检查 进入`do_timer` 。`do_timer` 再检查timer队列来执行任务.
+
 
 
 

@@ -196,7 +196,7 @@ void Start_Kernel(void)
 		// set_tss_descriptor(10 + global_i * 2, tss);
 		// set_tss64(tss, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start);
 
-		// 为apu 的idle分配内核栈顶
+		// 为apu 的idle分配内核栈顶 pcg 以及内核栈空间  低位是pcb
 		ptr = (unsigned char *)kmalloc(STACK_SIZE, 0);
 		_stack_start = (unsigned long)ptr + STACK_SIZE;
 		((struct task_struct *)ptr)->cpu_id = global_i; // 记录local apic id
@@ -207,7 +207,7 @@ void Start_Kernel(void)
 		init_tss[global_i].rsp1 = _stack_start;
 		init_tss[global_i].rsp2 = _stack_start;
 
-		// 分配自己的tss
+		// 分配自己的tss本身存储的空间
 		ptr = (unsigned char *)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
 		((struct task_struct *)(ptr - STACK_SIZE))->cpu_id = global_i;
 

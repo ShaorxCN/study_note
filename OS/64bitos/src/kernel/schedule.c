@@ -54,14 +54,14 @@ void schedule()
     tsk = get_next_task();
     color_printk(RED, BLACK, "schedule:%d#\n", jiffies);
 
-    // 检查vrun_time 如果小于继续执行 大于则切换
+    // 检查vrun_time  说明执行的时间已经长了 切换
     if (current->vrun_time >= tsk->vrun_time)
     {
         // running则继续等待调度执行
         if (current->state == TASK_RUNNING)
             insert_task_queue(current);
 
-        // 说明不是时间片耗尽引发的 重新保存进程可执行的时间片数量？
+        // 说明是时间片耗尽引发的 重新根据进程优先级设置保存进程可执行的时间片？
         if (!task_schedule.CPU_exec_task_jiffies)
             switch (tsk->priority)
             {
@@ -78,8 +78,10 @@ void schedule()
     }
     else
     {
+        // 这里表示不应该切换 所以重新插入tsk
         insert_task_queue(tsk);
 
+        // 检查是否是cpu时间片耗尽引发的中断
         if (!task_schedule.CPU_exec_task_jiffies)
             switch (tsk->priority)
             {

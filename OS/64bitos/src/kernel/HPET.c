@@ -32,6 +32,8 @@ void HPET_handler(unsigned long nr, unsigned long parameter, struct pt_regs *reg
     if ((container_of(list_next(&timer_list_head.list), struct timer_list, list)->expire_jiffies <= jiffies))
         set_softirq_status(TIMER_SIRQ);
 
+
+    // 这边维护cpu运行总的时间片 暂时只有这里会触发调度 就是发现cpu时间片耗尽
     switch (current->priority)
     {
     case 0:

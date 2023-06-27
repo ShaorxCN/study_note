@@ -85,7 +85,7 @@ struct task_struct
     /*
     0x0000,0000,0000,0000 - 0x0000,7fff,ffff,ffff user
     0xffff,8000,0000,0000 - 0xffff,ffff,ffff,ffff kernel 高位作为内核
-    e */
+    */
     unsigned long addr_limit; // 进程空间地址范围
 
     long pid; // 进程pid

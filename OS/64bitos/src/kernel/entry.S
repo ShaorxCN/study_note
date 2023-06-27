@@ -66,7 +66,7 @@ ENTRY(ret_from_intr)
 	testq softirq_status(%rip),%rcx              //64bit unsigned long  按位and 不等于说明置位了 触发过软中断上半部
 	jnz softirq_handler
 	GET_CURRENT(%rbx)                             // 获取当前pcb
-	movq TSK_PREEMPT(%rbx),%rcx   // 检查自旋锁的数量 为0说明开启可以抢占 不然需要释放锁后才能抢占 这边为不为0就直接返回 不参与调度
+	movq TSK_PREEMPT(%rbx),%rcx   // 检查自旋锁的数量 为0说明开启可以抢占 不然需要释放锁后才能抢占 这边不为0就直接返回 不参与调度 等待他继续执行释放自旋锁
 	cmpq $0,%rcx
 	jne RESTORE_ALL
 	movq TSK_FLAGS(%rbx),%rcx
@@ -81,7 +81,7 @@ softirq_handler:
 	cmpq $0,%rcx
 	jne RESTORE_ALL
 	movq TSK_FLAGS(%rbx),%rcx
-	test $2,%rcx
+	test $2,%rcx       // 是否可以被调度的flag  test 按位与 jnz如果不为零则跳转
 	jnz reschedule
 	jmp RESTORE_ALL
 

@@ -32,7 +32,7 @@ void softirq_init()
 void do_softirq()
 {
     int i;
-    sti();
+    sti(); // 这里提前允许中断 这样实现了将定时器等软中断放到中断下半部分的目的
 
     for (i = 0; i < 64 && softirq_status; i++)
     {
