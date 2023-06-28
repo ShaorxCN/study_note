@@ -53,6 +53,7 @@ void schedule()
     current->flags &= ~NEED_SCHEDULE;
     tsk = get_next_task();
     color_printk(RED, BLACK, "schedule:%d#\n", jiffies);
+ color_printk(RED, BLACK, "current :%p, tsk:%p#\n", current,tsk);
 
     // 检查vrun_time  说明执行的时间已经长了 切换
     if (current->vrun_time >= tsk->vrun_time)
@@ -74,6 +75,7 @@ void schedule()
                 task_schedule.CPU_exec_task_jiffies = 4 / task_schedule.running_task_count * 3;
                 break;
             }
+        // 这边只有中断才会有调度节点 所以原始进程的线程已经保存
         switch_to(current, tsk);
     }
     else

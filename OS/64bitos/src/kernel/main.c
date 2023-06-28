@@ -188,7 +188,8 @@ void Start_Kernel(void)
 	wrmsr(0x830, *(unsigned long *)&icr_entry); // INIT IPI
 	// 这边双核四线程
 	for (global_i = 1; global_i < 4; global_i++)
-	{
+	{	
+		// 枷锁防止并发global 值问题
 		spin_lock(&SMP_lock);
 
 		// _stack_start = (unsigned long)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
@@ -240,16 +241,6 @@ void Start_Kernel(void)
 	init_8259A();
 #endif
 
-	color_printk(RED, BLACK, "schedule init \n");
-	schedule_init();
-
-	color_printk(RED, BLACK, "Soft IRQ init \n");
-	softirq_init();
-
-	color_printk(RED, BLACK, "Timer & Clock init \n");
-	timer_init();
-	HPET_init();
-	sti();
 	// char buf[512];
 	// color_printk(PURPLE, BLACK, "disk write:\n");
 	// memset(buf, 0x44, 512);
@@ -264,6 +255,18 @@ void Start_Kernel(void)
 	// for (i = 0; i < 512; i++)
 	// 	color_printk(BLACK, WHITE, "%02x", buf[i]);
 	// color_printk(PURPLE, BLACK, "\ndisk read end\n");
+	
+	color_printk(RED, BLACK, "schedule init \n");
+	schedule_init();
+
+	color_printk(RED, BLACK, "Soft IRQ init \n");
+	softirq_init();
+
+	color_printk(RED, BLACK, "Timer & Clock init \n");
+	timer_init();
+	HPET_init();
+	sti();
+	
 	color_printk(RED, BLACK, "task_init \n");
 	task_init();
 

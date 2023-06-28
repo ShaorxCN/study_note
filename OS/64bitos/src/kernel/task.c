@@ -323,7 +323,7 @@ void task_init()
     init_task_union.task.state = TASK_RUNNING;
 
     // 从队列中找到init  然后切换 注释掉 改为调度器调度 上面代码已经insert queue
-    // p = container_of(list_next(&task_schedule.task_queue.list), struct task_struct, list);
-
+     p = container_of(list_next(&task_schedule.task_queue.list), struct task_struct, list);
+ color_printk(RED, BLACK, "current :%p, tsk:%p#\n", current,p);
     // switch_to(current, p);
 }

@@ -1,5 +1,6 @@
 #include "trap.h"
 #include "gate.h"
+#include "SMP.h"
 
 void sys_vector_init()
 {

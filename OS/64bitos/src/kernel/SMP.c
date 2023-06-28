@@ -84,6 +84,10 @@ void Start_SMP()
     spin_unlock(&SMP_lock);
 
     sti();
+    //  测试ap区分
+    //	if(SMP_cpu_id() != 1)
+    //		x = 1/0;
+
     while (1)
         hlt();
 }

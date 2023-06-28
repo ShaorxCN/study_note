@@ -282,7 +282,7 @@ void Start_Kernel(void)
 
 <img src="./img/IDT_no_stack_switch.png">
 
-这里的图都是上低下高？看图示 前后的ESP位置可以得出 入栈顺序即上面文字描述。
+
 
 中断门与陷阱门的不同之处在于执行处理程序时对IF标志位（位于标志寄存器EFLAGS中）的操作。中断门会复位IF以屏蔽其他中断请求的干扰。陷阱则不会。
 
