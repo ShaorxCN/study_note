@@ -290,6 +290,18 @@ bit[8]计数位宽 1是32bit 0是64bit 只有定时器0可以设置 其他固定
 首先是借助HPET的中断 然后进入后会检查`timer_list` 中是否有`expire_time` 小于计时器jiffies的 有的话则把软中断触发标志位 `softirq_status` 的bit0. 也就是定时器bit置位 这样从中断返回的时候检查标志位发现触发就进入`do_softirq` 这边一次检查 进入`do_timer` 。`do_timer` 再检查timer队列来执行任务.
 
 
+进程和线程的关系 
+
+基于pcb的图示
+
+<img src="./img/thread&process.png">
+
+如图:
+这边pcb分为两个部分 一个是独享资源 一个是共享资源。 这里thread_struct 执行现场和管理信息等是线程自己的 但是内存等信息则是共享的。
+
+相当于 共享资源 以及一个线程数组 里面是自己的执行信息以及管理信息
+
+
 
 
 

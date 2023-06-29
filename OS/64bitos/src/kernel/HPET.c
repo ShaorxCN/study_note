@@ -8,6 +8,7 @@
 #include "task.h"
 #include "schedule.h"
 #include "HPET.h"
+#include "SMP.h"
 extern struct time time;
 
 hw_int_controller HPET_int_controller =
@@ -24,32 +25,41 @@ unsigned char *HPET_addr = (unsigned char *)Phy_To_Virt(0xfed00000); // HPTC中0
 void HPET_handler(unsigned long nr, unsigned long parameter, struct pt_regs *regs)
 {
 
+    struct INT_CMD_REG icr_entry;
     *(unsigned long *)(HPET_addr + 0x108) = *(unsigned long *)(HPET_addr + 0xf0) + PERIOD;
     io_mfence();
     jiffies++;
 
+    // 广播代码 除了bsp自己
+    memset(&icr_entry, 0, sizeof(struct INT_CMD_REG));
+    icr_entry.vector = 0xc8;
+    icr_entry.dest_shorthand = ICR_ALL_EXCLUDE_Self;
+    icr_entry.trigger = APIC_ICR_IOAPIC_Edge;
+    icr_entry.dest_mode = ICR_IOAPIC_DELV_PHYSICAL;
+    icr_entry.deliver_mode = APIC_ICR_IOAPIC_Fixed;
+    wrmsr(0x830, *(unsigned long *)&icr_entry);
+
     // 减少中断下半部的进入 只有触发任务的时候才会进入
     if ((container_of(list_next(&timer_list_head.list), struct timer_list, list)->expire_jiffies <= jiffies))
         set_softirq_status(TIMER_SIRQ);
-
 
     // 这边维护cpu运行总的时间片 暂时只有这里会触发调度 就是发现cpu时间片耗尽
     switch (current->priority)
     {
     case 0:
     case 1:
-        task_schedule.CPU_exec_task_jiffies--;
+        task_schedule[SMP_cpu_id()].CPU_exec_task_jiffies--;
         current->vrun_time += 1;
         break;
     case 2:
     default:
-        task_schedule.CPU_exec_task_jiffies -= 2;
+        task_schedule[SMP_cpu_id()].CPU_exec_task_jiffies -= 2;
         current->vrun_time += 2;
         break;
     }
 
     // 时间片耗尽则当前进程可以被调度
-    if (task_schedule.CPU_exec_task_jiffies <= 0)
+    if (task_schedule[SMP_cpu_id()].CPU_exec_task_jiffies <= 0)
         current->flags |= NEED_SCHEDULE;
 }
 

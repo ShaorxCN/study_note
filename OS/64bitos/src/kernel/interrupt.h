@@ -45,6 +45,15 @@ int register_irq(unsigned long irq,
 
 int unregister_irq(unsigned long irq);
 
+int register_IPI(unsigned long irq,
+                 void *arg,
+                 void (*handler)(unsigned long nr, unsigned long parameter, struct pt_regs *regs),
+                 unsigned long parameter,
+                 hw_int_controller *controller,
+                 char *irq_name);
+
+int unregister_IPI(unsigned long irq);
+
 extern void (*interrupt[24])(void);
 
 extern void do_IRQ(struct pt_regs *regs, unsigned long nr);

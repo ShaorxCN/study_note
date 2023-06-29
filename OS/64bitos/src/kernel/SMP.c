@@ -5,6 +5,27 @@
 #include "gate.h"
 #include "interrupt.h"
 #include "task.h"
+#include "schedule.h"
+
+void IPI_0x200(unsigned long nr, unsigned long parameter, struct pt_regs *regs)
+{
+    switch (current->priority)
+    {
+    case 0:
+    case 1:
+        task_schedule[SMP_cpu_id()].CPU_exec_task_jiffies--;
+        current->vrun_time += 1;
+        break;
+    case 2:
+    default:
+        task_schedule[SMP_cpu_id()].CPU_exec_task_jiffies -= 2;
+        current->vrun_time += 2;
+        break;
+    }
+    if (task_schedule[SMP_cpu_id()].CPU_exec_task_jiffies <= 0)
+        current->flags |= NEED_SCHEDULE;
+}
+
 void SMP_init()
 {
     int i;
@@ -29,6 +50,8 @@ void SMP_init()
         set_intr_gate(i, 2, SMP_interrupt[i - 200]);
     }
     memset(SMP_IPI_desc, 0, sizeof(irq_desc_T) * 10);
+
+    register_IPI(200, NULL, &IPI_0x200, NULL, NULL, "IPI 0x200");
 }
 
 extern int global_i;
@@ -79,14 +102,40 @@ void Start_SMP()
                          : "memory");
 
     color_printk(RED, YELLOW, "x2APIC ID:%#010x\n", x);
-    memset(current, 0, sizeof(struct task_struct)); // 清空pcb
+
+    // 这边ap处理器的rsp已经赋值为新申请的内存空间了。 所以这边是新的栈底。
+    current->state = TASK_RUNNING;
+    current->flags = PF_KTHREAD;
+    current->mm = &init_mm;
+
+    list_init(&current->list);
+
+    current->addr_limit = 0xffff800000000000;
+    current->priority = 2;
+    current->vrun_time = 0;
+
+    // 放在内存current后面的开始处
+    current->thread = (struct thread_struct *)(current + 1);
+    memset(current->thread, 0, sizeof(struct thread_struct));
+    current->thread->rsp0 = _stack_start;
+    current->thread->rsp = _stack_start;
+    current->thread->fs = KERNEL_DS;
+    current->thread->gs = KERNEL_DS;
+    init_task[SMP_cpu_id()] = current;
+
     load_TR(10 + (global_i - 1) * 2);
+
     spin_unlock(&SMP_lock);
+    // main中的上锁是再bsp中的 bsp的  这边解锁是在ap中的 所以 这边preempt_count 是-1 不可抢占 entry中不可调度 这边手动赋值
+    current->preempt_count = 0;
 
     sti();
     //  测试ap区分
     //	if(SMP_cpu_id() != 1)
     //		x = 1/0;
+
+    if (SMP_cpu_id() == 3)
+        task_init();
 
     while (1)
         hlt();

@@ -143,7 +143,7 @@ unsigned long do_fork(struct pt_regs *regs, unsigned long clone_flags, unsigned 
     color_printk(WHITE, BLACK, "struct task_struct address:%#018lx\n", (unsigned long)tsk);
 
     memset(tsk, 0, sizeof(*tsk));
-    *tsk = *current;
+    *tsk = *current; // 直接复制mm等结构
 
     list_init(&tsk->list);
     list_add_to_before(&init_task_union.task.list, &tsk->list);
@@ -323,7 +323,7 @@ void task_init()
     init_task_union.task.state = TASK_RUNNING;
 
     // 从队列中找到init  然后切换 注释掉 改为调度器调度 上面代码已经insert queue
-     p = container_of(list_next(&task_schedule.task_queue.list), struct task_struct, list);
- color_printk(RED, BLACK, "current :%p, tsk:%p#\n", current,p);
+    p = container_of(list_next(&task_schedule[SMP_cpu_id()].task_queue.list), struct task_struct, list);
+    color_printk(RED, BLACK, "current :%p, tsk:%p#\n", current, p);
     // switch_to(current, p);
 }

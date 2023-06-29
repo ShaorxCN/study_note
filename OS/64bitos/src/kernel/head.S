@@ -30,7 +30,7 @@ ENTRY(_start)
 	mov	%ax,	%gs
 	mov	%ax,	%ss
 
-	movq	_stack_start(%rip),	%rsp
+	movq	_stack_start(%rip),	%rsp   // 指定初始rsp 再内核栈那边
 
 //=======	load	cr3
 

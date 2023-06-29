@@ -188,8 +188,8 @@ void Start_Kernel(void)
 	wrmsr(0x830, *(unsigned long *)&icr_entry); // INIT IPI
 	// 这边双核四线程
 	for (global_i = 1; global_i < 4; global_i++)
-	{	
-		// 枷锁防止并发global 值问题
+	{
+		// 加锁防止并发global 值问题
 		spin_lock(&SMP_lock);
 
 		// _stack_start = (unsigned long)kmalloc(STACK_SIZE, 0) + STACK_SIZE;
@@ -197,7 +197,7 @@ void Start_Kernel(void)
 		// set_tss_descriptor(10 + global_i * 2, tss);
 		// set_tss64(tss, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start, _stack_start);
 
-		// 为apu 的idle分配内核栈顶 pcg 以及内核栈空间  低位是pcb
+		// 为apu 的idle分配内核栈顶 pcb 以及内核栈空间  低位是pcb
 		ptr = (unsigned char *)kmalloc(STACK_SIZE, 0);
 		_stack_start = (unsigned long)ptr + STACK_SIZE;
 		((struct task_struct *)ptr)->cpu_id = global_i; // 记录local apic id
@@ -255,7 +255,7 @@ void Start_Kernel(void)
 	// for (i = 0; i < 512; i++)
 	// 	color_printk(BLACK, WHITE, "%02x", buf[i]);
 	// color_printk(PURPLE, BLACK, "\ndisk read end\n");
-	
+
 	color_printk(RED, BLACK, "schedule init \n");
 	schedule_init();
 
@@ -266,7 +266,7 @@ void Start_Kernel(void)
 	timer_init();
 	HPET_init();
 	sti();
-	
+
 	color_printk(RED, BLACK, "task_init \n");
 	task_init();
 
