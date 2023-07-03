@@ -126,6 +126,7 @@ void Start_SMP()
     load_TR(10 + (global_i - 1) * 2);
 
     spin_unlock(&SMP_lock);
+    // TODO: 那bsp的可抢占是怎么置零的  这边可以打印ap的preempt_count
     // main中的上锁是再bsp中的 bsp的  这边解锁是在ap中的 所以 这边preempt_count 是-1 不可抢占 entry中不可调度 这边手动赋值
     current->preempt_count = 0;
 
