@@ -72,7 +72,7 @@ void schedule()
         if (current->state == TASK_RUNNING)
             insert_task_queue(current);
 
-        // 说明是时间片耗尽引发的 重新根据进程优先级设置保存进程可执行的时间片？
+        // 说明是时间片耗尽引发的 重新根据进程优先级设置保存进程可执行的时间片
         if (!task_schedule[cpu_id].CPU_exec_task_jiffies)
             switch (tsk->priority)
             {
