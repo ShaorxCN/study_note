@@ -185,10 +185,299 @@ String dump of section '.shstrtab':
   [    52]  .rela.eh_frame
 ```
 
+这边`objdump -x -s -d elfDemo.rel` 中的选项分别代表是显示文件的头部信息，展示所有section的内容 以及disassemble展示可执行section的汇编内容。
+
+我们先`objdump -s -j .text -d elfDemo.rel`查看`.text`部分的内容。
+
+```
+elfDemo.rel:     file format elf64-x86-64
+
+Contents of section .text:
+ 0000 554889e5 4883ec10 897dfc8b 45fc89c6  UH..H....}..E...
+ 0010 488d3d00 000000b8 00000000 e8000000  H.=.............
+ 0020 0090c9c3 554889e5 4883ec10 c745fc1e  ....UH..H....E..
+ 0030 0000008b 15000000 008b45fc 01c28b05  ..........E.....
+ 0040 00000000 01d089c7 e8000000 0090c9c3  ................
+
+Disassembly of section .text:
+
+0000000000000000 <func>:
+   0:   55                      push   %rbp
+   1:   48 89 e5                mov    %rsp,%rbp
+   4:   48 83 ec 10             sub    $0x10,%rsp
+   8:   89 7d fc                mov    %edi,-0x4(%rbp)
+   b:   8b 45 fc                mov    -0x4(%rbp),%eax
+   e:   89 c6                   mov    %eax,%esi
+  10:   48 8d 3d 00 00 00 00    lea    0x0(%rip),%rdi        # 17 <func+0x17>
+  17:   b8 00 00 00 00          mov    $0x0,%eax
+  1c:   e8 00 00 00 00          callq  21 <func+0x21>
+  21:   90                      nop
+  22:   c9                      leaveq
+  23:   c3                      retq
+
+0000000000000024 <main>:
+  24:   55                      push   %rbp
+  25:   48 89 e5                mov    %rsp,%rbp
+  28:   48 83 ec 10             sub    $0x10,%rsp
+  2c:   c7 45 fc 1e 00 00 00    movl   $0x1e,-0x4(%rbp)
+  33:   8b 15 00 00 00 00       mov    0x0(%rip),%edx        # 39 <main+0x15>
+  39:   8b 45 fc                mov    -0x4(%rbp),%eax
+  3c:   01 c2                   add    %eax,%edx
+  3e:   8b 05 00 00 00 00       mov    0x0(%rip),%eax        # 44 <main+0x20>
+  44:   01 d0                   add    %edx,%eax
+  46:   89 c7                   mov    %eax,%edi
+  48:   e8 00 00 00 00          callq  4d <main+0x29>
+  4d:   90                      nop
+  4e:   c9                      leaveq
+  4f:   c3                      retq 
+```
+
+`content`部分就是实际内容。对应的size是`50`.接下去的则是汇编部分。
+
+同理下面是`.data`
+
+```
+elfDemo.rel:     file format elf64-x86-64
+
+Contents of section .data:
+ 0000 0a000000 14000000                    ........        
+
+Disassembly of section .data:
+
+0000000000000000 <global_init_var>:
+   0:   0a 00 00 00                                         ....
+
+0000000000000004 <local_static_init_var.1>:
+   4:   14 00 00 00                                         ....
+```
+
+其中保存初始化过的全局变量和局部静态变量`global_init_var`和`local_static_init_var`。值是`0a000000`和`14000000`对应代码中的`10`和`20`（小端序） 这里每个变量四个字节。返回
+
+然后是`.rodata`只读部分
 
 
+```
+Contents of section .rodata:
+ 0000 25640a00                             %d..
+
+Disassembly of section .rodata:
+
+0000000000000000 <.rodata>:
+   0:   25                      .byte 0x25
+   1:   64 0a 00                or     %fs:(%rax),%al 
+```
+
+这边只读的部分是`printf`中的格式化字符串`%d\n` `25640a` 是对应的ascii16进制
+
+然后是`.bss`部分
+
+```
+Disassembly of section .bss:
+
+0000000000000000 <global_uninit_var>:
+   0:   00 00 00 00                                         ....
+
+0000000000000004 <local_static_uninit_var.0>:
+   4:   00 00 00 00    
+```
+
+保存的是未初始化的全局变量和局部静态变量。因为未初始化，所有没有实际的content部分。
+
+这边全局变量和局部静态变量是跟随程序生命周期的。由编译器负责分配以及释放。所以这边可以看到。局部变量则是在栈上。调用的时候才会分配。
+
+下面是`.strtab` section的说明
 
 
+```
+Hex dump of section '.strtab':
+  0x00000000 00656c66 44656d6f 2e63006c 6f63616c .elfDemo.c.local
+  0x00000010 5f737461 7469635f 696e6974 5f766172 _static_init_var
+  0x00000020 2e31006c 6f63616c 5f737461 7469635f .1.local_static_
+  0x00000030 756e696e 69745f76 61722e30 00676c6f uninit_var.0.glo
+  0x00000040 62616c5f 696e6974 5f766172 00676c6f bal_init_var.glo
+  0x00000050 62616c5f 756e696e 69745f76 61720066 bal_uninit_var.f
+  0x00000060 756e6300 5f474c4f 42414c5f 4f464653 unc._GLOBAL_OFFS
+  0x00000070 45545f54 41424c45 5f007072 696e7466 ET_TABLE_.printf
+  0x00000080 006d6169 6e00                       .main.
+```
+字符串以null作为开始和结尾。中间则是实际内容。引用字符串的时候给出offset即可。它通常包含了字符串常量，如函数名、变量名等.主要是下面两类。
+
+1. 符号表中的字符串： 在符号表（.symtab）中，存储了与代码相关的符号信息，例如函数名、变量名等。这些符号表项通常包含对 .strtab 节的偏移量，以指向字符串表中对应的字符串。
+
+2. 动态链接时需要的字符串： 在动态链接过程中，一些字符串用于标识库、函数或变量的名称，这些字符串也会存储在 .strtab 节中。
+
+然后就是提到的符号表.`.symtab`.他还有个子集:`dynsym`.就和命名一样。一般静态链接使用`symtab`然后动态链接使用`dynsym`.
+
+`readelf -s elfDemo.rel`
+
+```
+Symbol table '.symtab' contains 17 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS elfDemo.c
+     2: 0000000000000000     0 SECTION LOCAL  DEFAULT    1
+     3: 0000000000000000     0 SECTION LOCAL  DEFAULT    3
+     4: 0000000000000000     0 SECTION LOCAL  DEFAULT    4
+     5: 0000000000000000     0 SECTION LOCAL  DEFAULT    5
+     6: 0000000000000004     4 OBJECT  LOCAL  DEFAULT    3 local_static_ini[...]
+     7: 0000000000000004     4 OBJECT  LOCAL  DEFAULT    4 local_static_uni[...]
+     8: 0000000000000000     0 SECTION LOCAL  DEFAULT    7
+     9: 0000000000000000     0 SECTION LOCAL  DEFAULT    8
+    10: 0000000000000000     0 SECTION LOCAL  DEFAULT    6
+    11: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    3 global_init_var
+    12: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    4 global_uninit_var
+    13: 0000000000000000    36 FUNC    GLOBAL DEFAULT    1 func
+    14: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND _GLOBAL_OFFSET_TABLE_
+    15: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND printf
+    16: 0000000000000024    44 FUNC    GLOBAL DEFAULT    1 main
+```
+
+
+`readelf -x .symtab elfDemo.rel`
+
+
+```
+Hex dump of section '.symtab':
+  0x00000000 00000000 00000000 00000000 00000000 ................
+  0x00000010 00000000 00000000 01000000 0400f1ff ................
+  0x00000020 00000000 00000000 00000000 00000000 ................
+  0x00000030 00000000 03000100 00000000 00000000 ................
+  0x00000040 00000000 00000000 00000000 03000300 ................
+  0x00000050 00000000 00000000 00000000 00000000 ................
+  0x00000060 00000000 03000400 00000000 00000000 ................
+  0x00000070 00000000 00000000 00000000 03000500 ................
+  0x00000080 00000000 00000000 00000000 00000000 ................
+  0x00000090 0b000000 01000300 04000000 00000000 ................
+  0x000000a0 04000000 00000000 23000000 01000400 ........#.......
+  0x000000b0 04000000 00000000 04000000 00000000 ................
+  0x000000c0 00000000 03000700 00000000 00000000 ................
+  0x000000d0 00000000 00000000 00000000 03000800 ................
+  0x000000e0 00000000 00000000 00000000 00000000 ................
+  0x000000f0 00000000 03000600 00000000 00000000 ................
+  0x00000100 00000000 00000000 3d000000 11000300 ........=.......
+  0x00000110 00000000 00000000 04000000 00000000 ................
+  0x00000120 4d000000 11000400 00000000 00000000 M...............
+  0x00000130 04000000 00000000 5f000000 12000100 ........_.......
+  0x00000140 00000000 00000000 24000000 00000000 ........$.......
+  0x00000150 64000000 10000000 00000000 00000000 d...............
+  0x00000160 00000000 00000000 7a000000 10000000 ........z.......
+  0x00000170 00000000 00000000 00000000 00000000 ................
+  0x00000180 81000000 12000100 24000000 00000000 ........$.......
+  0x00000190 2c000000 00000000                   ,.......
+```
+
+这边通过`readelf -S your_object_file`中看到`symtab`的`EntSize`看到是`18h`也就是24字节。这边自己解释一个entry
+
+结构如下:
+
+```C
+// 这里字节的标注需要参考section header中`entSize`以及实际情况 这里已经读取24了
+typedef struct {
+    Elf64_Word      st_name;  // 符号名在字符串表的偏移量  4 
+    unsigned char   st_info;  // 符号的类型和绑定信息     1
+    unsigned char   st_other; // 保留字段                1
+    Elf64_Section   st_shndx; // 符号所在的节的索引       2 
+    Elf64_Addr      st_value; // 符号的值（地址）         8
+    Elf64_Xword     st_size;  // 符号的大小(字节)               8
+} Elf64_Sym;
+
+```
+
+
+```
+以下是一些可能的 Type 和 Bind 的取值：
+Type（符号类型）：
+
+STT_NOTYPE（0x0）：无类型。
+STT_OBJECT（0x1）：对象。
+STT_FUNC（0x2）：函数。
+STT_SECTION（0x3）：节。
+STT_FILE（0x4）：文件。
+等等，具体的类型取值可以在 ELF 规范中查找。
+
+Bind（符号绑定信息）：
+
+STB_LOCAL（0x0）：局部符号，只在当前目标文件或共享库中可见。
+STB_GLOBAL（0x1）：全局符号，对于多个目标文件和共享库可见。
+STB_WEAK（0x2）：弱符号，对于多个目标文件和共享库可见，但其定义可能被覆盖。
+```
+
+
+`01000000 0400f1ff 00000000 00000000 00000000 00000000` 因为index 0 是没有意义的。所以解释下01，小端序。然后st_name在前面。也就是按照顺序排。
+
+`st_name`: `01000000` 实际是`00000001` 那么通过`strtab`中从1开始读取读到null则是`elfDemo.c`
+
+`st_info`:`04` 同样小端序 低四位是bind 高4bit是符号类型.这里也就是说局部以及文件。也就是`lcoal` 和`file` 和上图的一致
+
+`st_other`:保留字段 1字节`00`跳过。
+
+`st_shndx`:符号所在节的索引。`f1ff`就是`0xfff1`这是一个保留值。`#define SHN_ABS 0xFFF1` 所以就是`ABS`和读取的信息一致。
+
+`st_value`和`st_size`都是8字节。这边都是0，一致。
+
+
+然后是重定位部分。重定位是链接符定义和符号引用的过程。可重定位文件在构建可执行文件的时候会将节中的符号引用换成这些符号在进程空间中的虚拟地址。包含这些转换信息的数据就是重定位项。
+
+
+` readelf -r elfDemo.rel `
+
+```
+Relocation section '.rela.text' at offset 0x340 contains 5 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000000013  000500000002 R_X86_64_PC32     0000000000000000 .rodata - 4
+00000000001d  000f00000004 R_X86_64_PLT32    0000000000000000 printf - 4
+000000000035  000b00000002 R_X86_64_PC32     0000000000000000 global_init_var - 4
+000000000040  000300000002 R_X86_64_PC32     0000000000000000 .data + 0
+000000000049  000d00000004 R_X86_64_PLT32    0000000000000000 func - 4
+
+Relocation section '.rela.eh_frame' at offset 0x3b8 contains 2 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000000020  000200000002 R_X86_64_PC32     0000000000000000 .text + 0
+000000000040  000200000002 R_X86_64_PC32     0000000000000000 .text + 24
+```
+
+
+结构如下:
+
+```C
+typedef struct {
+    Elf64_Addr r_offset; // 符号需要被重定位的位置
+    Elf64_Xword r_info;  // 保存着与重定位相关的信息，包括符号索引和重定位类型
+} Elf64_Rel;
+
+其中：
+
+r_offset 字段表示需要被重定位的位置，即需要进行地址调整的位置。
+r_info   字段保存着与重定位相关的信息，包括符号索引和重定位类型。
+r_info   字段中的信息一般使用宏进行提取：
+
+ELF64_R_SYM(info)：提取符号索引。
+ELF64_R_TYPE(info)：提取重定位类型。
+其中高 32 位用于存储符号索引，低 32 位用于存储重定位类型。
+
+Elf64_Rel 结构体的大小为 16 字节（8 字节 r_offset + 8 字节 r_info）。
+
+typedef struct {
+    Elf64_Addr r_offset; // 符号需要被重定位的位置
+    Elf64_Xword r_info;  // 保存着与重定位相关的信息，包括符号索引和重定位类型
+    Elf64_Sxword r_addend; // 常数值，用于与符号值相加，得到最终的重定位值
+} Elf64_Rela;
+
+
+其中：
+
+r_offset 字段表示需要被重定位的位置，即需要进行地址调整的位置。
+r_info   字段保存着与重定位相关的信息，包括符号索引和重定位类型。
+r_addend 字段是一个带符号整数，用于与符号的值相加，得到最终的重定位值。
+r_info   字段中的信息可以使用宏进行提取：
+
+ELF64_R_SYM(info)：提取符号索引。
+ELF64_R_TYPE(info)：提取重定位类型。
+
+Elf64_Rela 结构体的大小为 24 字节（8 字节 r_offset + 8 字节 r_info + 8 字节 r_addend）。
+```
+
+这里简单说明下。其中`info`包含`symbol`和`type`。`symbol`是符号索引(index 不是byte偏移)。举个例子 `global_init_var` 的info是`000b00000002`然后高32bit是`000b`(这边没有-x所以这边已经小端序转换过了.).那么对应`symtab`中就index `11` 是 `global_init_var`.和`.symbol` 一致。`type`可以表示重定位地址是相对地址还是绝对地址重定位的精确方式。
 
 
 
