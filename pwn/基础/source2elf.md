@@ -7,7 +7,10 @@
     - [GCC 编译实例](#c1-2)
 -  [2 ELF文件](#c2)
     - [ELF文件结构](#c2-1)
-
+      - [链接视角](#c2-1-1)
+      - [运行视角](#c2-1-2)
+-  [3 静态链接](#c3)
+-  [4 静态链接](#c4)
 </br></br></br></br>
 <div id=c1><h2>编译原理</h2></div>
 
@@ -78,7 +81,7 @@ elf分为四种文件：
 
 
 
-**先从链接视角**:
+<div id=c2-1-1><h4>链接视角</h4></div>
 
 链接视角通过节 section 来划分。ELF通常都会包含3个固定的节:
 
@@ -383,6 +386,8 @@ typedef struct {
 
 ```
 
+这边addr等一般是虚拟地址现在。
+
 
 ```
 以下是一些可能的 Type 和 Bind 的取值：
@@ -480,9 +485,249 @@ Elf64_Rela 结构体的大小为 24 字节（8 字节 r_offset + 8 字节 r_info
 这里简单说明下。其中`info`包含`symbol`和`type`。`symbol`是符号索引(index 不是byte偏移)。举个例子 `global_init_var` 的info是`000b00000002`然后高32bit是`000b`(这边没有-x所以这边已经小端序转换过了.).那么对应`symtab`中就index `11` 是 `global_init_var`.和`.symbol` 一致。`type`可以表示重定位地址是相对地址还是绝对地址重定位的精确方式。
 
 
+<div id=c2-1-2><h4>运行视角</h4></div>
+
+`readelf -l elfDemo.exec`
+
+```
+Elf file type is DYN (Shared object file)
+Entry point 0x1050
+There are 11 program headers, starting at offset 64
+
+Program Headers:
+  Type           Offset             VirtAddr           PhysAddr
+                 FileSiz            MemSiz              Flags  Align
+  PHDR           0x0000000000000040 0x0000000000000040 0x0000000000000040
+                 0x0000000000000268 0x0000000000000268  R      0x8
+  INTERP         0x00000000000002a8 0x00000000000002a8 0x00000000000002a8
+                 0x000000000000001c 0x000000000000001c  R      0x1
+      [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]
+  LOAD           0x0000000000000000 0x0000000000000000 0x0000000000000000
+                 0x0000000000000568 0x0000000000000568  R      0x1000
+  LOAD           0x0000000000001000 0x0000000000001000 0x0000000000001000
+                 0x00000000000001fd 0x00000000000001fd  R E    0x1000
+  LOAD           0x0000000000002000 0x0000000000002000 0x0000000000002000
+                 0x0000000000000178 0x0000000000000178  R      0x1000
+  LOAD           0x0000000000002de8 0x0000000000003de8 0x0000000000003de8
+                 0x0000000000000250 0x0000000000000260  RW     0x1000
+  DYNAMIC        0x0000000000002df8 0x0000000000003df8 0x0000000000003df8
+                 0x00000000000001e0 0x00000000000001e0  RW     0x8
+  NOTE           0x00000000000002c4 0x00000000000002c4 0x00000000000002c4
+                 0x0000000000000044 0x0000000000000044  R      0x4
+  GNU_EH_FRAME   0x0000000000002008 0x0000000000002008 0x0000000000002008
+                 0x0000000000000044 0x0000000000000044  R      0x4
+  GNU_STACK      0x0000000000000000 0x0000000000000000 0x0000000000000000
+                 0x0000000000000000 0x0000000000000000  RW     0x10
+  GNU_RELRO      0x0000000000002de8 0x0000000000003de8 0x0000000000003de8
+                 0x0000000000000218 0x0000000000000218  R      0x1
+
+ Section to Segment mapping:
+  Segment Sections...
+   00
+   01     .interp
+   02     .interp .note.gnu.build-id .note.ABI-tag .gnu.hash .dynsym .dynstr .gnu.version .gnu.version_r .rela.dyn .rela.plt
+   03     .init .plt .plt.got .text .fini
+   04     .rodata .eh_frame_hdr .eh_frame
+   05     .init_array .fini_array .dynamic .got .got.plt .data .bss 
+   06     .dynamic
+   07     .note.gnu.build-id .note.ABI-tag
+   08     .eh_frame_hdr
+   09
+   10     .init_array .fini_array .dynamic .got
+```
+
+这边参考一开始的图形。就是会将section进行分组，一般是按照读写执行权限分组的。这样可以节约资源。可执行程序通常至少有一个`PT_LOAD` segment.就是上图的`LOAD`.动态链接的可执行文件可能有多个。讲`.data`和`.text`分开存放。`PT_DYNAMIC`(也就是上面的DYNAMIC)存放动态链接器必须的信息比如共享库列表GOT表和重定位表等。`PT_NOTE`保存系统相关的附加信息。`PT_INTERP`将位置和大小信息存放在一个字符串中。是对程序解释器位置的描述。`PT_PHDR`保存程序头表本身的信息。
+
+```c
+typedef struct {
+    Elf64_Word   p_type;    // Segment type
+    Elf64_Word   p_flags;   // Segment flags
+    Elf64_Off    p_offset;  // Segment file offset
+    Elf64_Addr   p_vaddr;   // Segment virtual address
+    Elf64_Addr   p_paddr;   // Segment physical address
+    Elf64_Xword  p_filesz;  // Segment size in file (byte)
+    Elf64_Xword  p_memsz;   // Segment size in memory(byte)
+    Elf64_Xword  p_align;   // Segment alignment
+} Elf64_Phdr;
+
+```
+
+这边关注虚拟地址即可。物理地址一般是链接的时候确定。如果运行时发生冲突可以通过修改以及转移解决问题。当然通过虚拟地址只需要修改映射更新页表即可。当然可执行文件的运行还需要栈堆vDSO(虚拟动态链接共享库 提供一些系统调用的空间实现)等空间。
+
+
+<div id=c3><h2>静态链接</h2></div>
+
+`gcc -static -fno-stack-protector .\main.c .\func.c -save-temps --verbose -o ..\target\func.ELF`
+
+这边是静态编译。就是所有库文件都会保存在可执行文件中。
+一般会将属性相同的section 合并。比如这里将`func.o`和`main.o`的`.text`合并成一个`.text`等。
+
+
+为了构建可执行文件，链接器必须要完成两件事:符号解析和重定位。符号解析就是将多个文件中每个符号(函数 全局变量 静态变量)的引用和其定义进行关联。重定位这是将这边每个符号的定义和一个内存地址进行关联。然后修改这些符号的引用 指向这个内存地址(一般是虚拟地址)。
+
+比如ch1/elf中的例子。其中main.o 通过objdump发现其中的vam都是0也就是没有分配地址。但是func.ELF中则是有值的。
+
+```
+----objdump -h main.o
+main.o:     file format elf64-x86-64
+
+Sections:
+Idx Name          Size      VMA               LMA               File off  Algn
+  0 .text         00000029  0000000000000000  0000000000000000  00000040  2**0
+                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
+  1 .data         00000000  0000000000000000  0000000000000000  00000069  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  2 .bss          00000000  0000000000000000  0000000000000000  00000069  2**0
+                  ALLOC
+  ....
+
+```
+
+```
+-------objdump -h func.ELF 
+func.ELF:     file format elf64-x86-64
+
+Sections:
+Idx Name          Size      VMA               LMA               File off  Algn
+  ...
+
+  5 .text         00085ff0  00000000004010e0  00000000004010e0  000010e0  2**5
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  
+  ...
+
+ 18 .data         00001a50  00000000004b30e0  00000000004b30e0  000b20e0  2**5
+                  CONTENTS, ALLOC, LOAD, DATA
+
+ 22 .bss          000017a0  00000000004b5240  00000000004b5240  000b4230  2**5
+                  ALLOC
+  
+  ....
+
+```
+这边只贴了text bss 和 data 部分。
+
+`objdump -d -M intel --section=.text main.o`
+ 
+这边反汇编main.o代码 -m intel表示intel汇编 也就是 op dst,src
+
+```
+main.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:       
+
+0000000000000000 <main>:
+   0:   55                      push   rbp
+   1:   48 89 e5                mov    rbp,rsp
+   4:   48 83 ec 10             sub    rsp,0x10
+   8:   c7 45 fc 64 00 00 00    mov    DWORD PTR [rbp-0x4],0x64
+   f:   48 8d 45 fc             lea    rax,[rbp-0x4]
+  13:   48 8d 35 00 00 00 00    lea    rsi,[rip+0x0]        # 1a <main+0x1a>
+  1a:   48 89 c7                mov    rdi,rax
+  1d:   e8 00 00 00 00          call   22 <main+0x22>
+  22:   b8 00 00 00 00          mov    eax,0x0
+  27:   c9                      leave
+  28:   c3                      ret
+```
+
+这边可以看到 还没重定位。call指令后面是0(这里机器码是相对于下条指令地址计算e8后面的值 也就是offset 0，27h+0 = 27h )  在汇编那就是call 27 就是基于那么就是直接跑到下一条指令mov那边 也刚好是call 27.这边是近调用。还有个参数shared有暂时是0也就是13那儿
+
+
+`objdump -d -M intel --section=.text func.ELF  | grep -A 14 "<main>"`
+这边反编译并找到<main>以及后面14行 
+
+```
+0000000000401c2d <main>:
+  401c2d:       55                      push   rbp
+  401c2e:       48 89 e5                mov    rbp,rsp
+  401c31:       48 83 ec 10             sub    rsp,0x10
+  401c35:       c7 45 fc 64 00 00 00    mov    DWORD PTR [rbp-0x4],0x64
+  401c3c:       48 8d 45 fc             lea    rax,[rbp-0x4]
+  401c40:       48 8d 35 a9 04 0b 00    lea    rsi,[rip+0xb04a9]        # 4b20f0 <shared>
+  401c47:       48 89 c7                mov    rdi,rax
+  401c4a:       e8 07 00 00 00          call   401c56 <func>
+  401c4f:       b8 00 00 00 00          mov    eax,0x0
+  401c54:       c9                      leave
+  401c55:       c3                      ret
+
+0000000000401c56 <func>:
+  401c56:       55                      push   rbp
+```
+
+这边已将将call替换为func的实际地址了。机器码那边的偏移也是到<func>.shared也是。见下面:
+
+```
+--- readelf -s func.ELF | grep shared
+00000000004b20f0     4 OBJECT  GLOBAL DEFAULT   19 shared
+```
+
+这边看下重定位表。可重定位文件中最重要的部分。告诉链接器如何修改节的内容。`R_X86_64_PC32`是基于`pc`的相对地址
+`R_X86_64_PLT32`则是基于`PLT`的相对地址。这边`0x0000000000000004`是r_addend的值用来修正
+
+`PLT`过程链接表 实现延迟绑定，也就是调用的时候才进行函数绑定。
 
 
 
+```
+-----objdump -r main.o
+
+main.o:     file format elf64-x86-64
+
+RELOCATION RECORDS FOR [.text]:
+OFFSET           TYPE              VALUE
+0000000000000016 R_X86_64_PC32     shared-0x0000000000000004
+000000000000001e R_X86_64_PLT32    func-0x0000000000000004
 
 
+RELOCATION RECORDS FOR [.eh_frame]:
+OFFSET           TYPE              VALUE
+0000000000000020 R_X86_64_PC32     .text
+```
 
+
+这边时延迟绑定。需要运行的时候看。
+
+<div id=c4><h2>动态链接</h2></div>
+
+因为静态链接会把所有的文件都打包进去。比如两个elf都依赖公共的c，那么静态链接出来的elf都会包含c。运行的时候就会加载两个c。造成内存的浪费 。
+
+
+```shell
+ gcc -shared -fpic -o func.so ../code/func.c  #  fpic生成位置无关的代码
+ gcc -fno-stack-protector -o func.ELF2 ../code/main.c  ./func.so
+ ldd func.ELF2 
+```
+
+```
+linux-vdso.so.1 (0x00007fffcae38000)
+./func.so (0x00007fc4e4370000)
+libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fc4e4190000)
+/lib64/ld-linux-x86-64.so.2 (0x00007fc4e438c000)
+
+```
+
+
+```
+--- objdump -d -M intel --section=.text func.ELF2  | grep -A 11 "<main>"
+
+0000000000001135 <main>:
+    1135:       55                      push   rbp
+    1136:       48 89 e5                mov    rbp,rsp
+    1139:       48 83 ec 10             sub    rsp,0x10
+    113d:       c7 45 fc 64 00 00 00    mov    DWORD PTR [rbp-0x4],0x64
+    1144:       48 8d 45 fc             lea    rax,[rbp-0x4]
+    1148:       48 8d 35 e1 2e 00 00    lea    rsi,[rip+0x2ee1]        # 4030 <shared>
+    114f:       48 89 c7                mov    rdi,rax
+    1152:       e8 d9 fe ff ff          call   1030 <func@plt>
+    1157:       b8 00 00 00 00          mov    eax,0x0
+    115c:       c9                      leave
+    115d:       c3                      ret
+
+```
+
+这边就是`<func@plt>`
+
+这边涉及到几个section
+
+`.got` :`global offset table`.位于数据段的开头。保存全局变量和库函数的引用。因为一个程序或者共享库数据段和代码段的相对距离时不变的，指令和变量之间的距离就是一个运行时常量和绝对内存地址无关。这边分为 `.got`和`.got.plt`也就是区分时候需要延迟绑定。前者一般存储全局变量的引用。加载到内存后标记为只读。后者则是保存函数引用。具有读写权限。
