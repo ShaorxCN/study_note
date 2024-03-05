@@ -631,7 +631,7 @@ Disassembly of section .text:
   28:   c3                      ret
 ```
 
-这边可以看到 还没重定位。call指令后面是0(这里机器码是相对于下条指令地址计算e8后面的值 也就是offset 0，27h+0 = 27h )  在汇编那就是call 27 就是基于那么就是直接跑到下一条指令mov那边 也刚好是call 27.这边是近调用。还有个参数shared有暂时是0也就是13那儿
+这边可以看到 还没重定位。call指令后面是0(这里机器码是相对于下条指令地址计算e8后面的值 也就是offset 0，22h+0 = 22h )  在汇编那就是call 22 直接跑到下一条指令mov那边 也刚好是call 27.这边是近调用。还有个参数shared有暂时是0也就是13那儿
 
 
 `objdump -d -M intel --section=.text func.ELF  | grep -A 14 "<main>"`
@@ -730,4 +730,52 @@ libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fc4e4190000)
 
 这边涉及到几个section
 
-`.got` :`global offset table`.位于数据段的开头。保存全局变量和库函数的引用。因为一个程序或者共享库数据段和代码段的相对距离时不变的，指令和变量之间的距离就是一个运行时常量和绝对内存地址无关。这边分为 `.got`和`.got.plt`也就是区分时候需要延迟绑定。前者一般存储全局变量的引用。加载到内存后标记为只读。后者则是保存函数引用。具有读写权限。
+`.got` :`global offset table`.位于数据段的开头。保存全局变量和库函数的引用。因为一个程序或者共享库数据段和代码段的相对距离时不变的，指令和变量之间的距离就是一个运行时常量和绝对内存地址无关。这边分为 `.got`和`.got.plt`也就是区分是否需要延迟绑定。前者一般存储不需要延迟绑定的全局变量的引用以及函数。加载到内存后标记为只读(我readelf -H 看的是读写)。后者则是保存需要延迟绑定的函数引用。具有读写权限。因为时在运行时候解析实际地址。所以读写。`.got.plt`是为`.plt`准备的。属于子集。通过查看section headers 两者的地址相连的。
+
+这边提下延迟绑定。
+
+就是`.got.plt` 和 `.plt`配合.
+
+`.plt`是一个数组  每个条目16字节。PLT[0] 的作用是在程序第一次调用一个动态链接库函数时进行初始化。PLT[1] 用于调用`__lib_start_main()`.进行初始化并调用main.
+PLT[2]开始则是被调用的各个函数条目。
+
+`.got.plt` 也是一个数组，每个条目8字节.其中index 0,1包含动态链接器解析函数地址时需要的两个参数`.dynamic` 和 `reloc`条目。index 2是动态链接器`ld_linux.so`的入口 用于进入动态链接器。index 3开始才是对应的各个函数条目。这些条目默认只想对应PLT的第二条指令。这条指令一般是被调用函数在`rel.plt`的下标。
+
+这样调用过程就是先进入`.got.plt`如果没有修改绑定实际地址的话 那就是默认到对应`.plt`的第二条指令，将函数名index入栈.然后jmp到PLT[0].第一条指令是动态链接器入参，然后PLT[0]的第二条指令是跳转到GOT[2]就是动态链接器的入口。动态链接器根据入栈的参数解析函数运行时的地址并且将地址写入对应的GOT项中。再把控制流程转交给解析出的函数。
+
+
+
+
+
+```
+--- objdump -h func.so
+Sections:
+
+| Idx  | Name     | Size     | VMA              | LMA              | File     | off  | Algn                        |
+| :--- | :------- | :------- | :--------------- | :--------------- | :------- | :--- | :-------------------------- |
+| 15   | .got     | 00000028 | 0000000000003fd8 | 0000000000003fd8 | 00002fd8 | 2**3 | CONTENTS, ALLOC, LOAD, DATA |
+| 16   | .got.plt | 00000018 | 0000000000004000 | 0000000000004000 | 00003000 | 2**3 | CONTENTS, ALLOC, LOAD, DATA |
+
+
+--- readelf -r func.so | grep tmp
+
+000000003fd8  000500000006 R_X86_64_GLOB_DAT 0000000000004028 tmp + 0
+
+--- objdump -d -M intel --section=.text func.so | grep -A 20 "<func>"
+
+  10f5:       55                      push   rbp
+  10f6:       48 89 e5                mov    rbp,rsp
+  10f9:       48 89 7d f8             mov    QWORD PTR [rbp-0x8],rdi
+  10fd:       48 89 75 f0             mov    QWORD PTR [rbp-0x10],rsi
+  1101:       48 8b 45 f8             mov    rax,QWORD PTR [rbp-0x8]
+  1105:       8b 10                   mov    edx,DWORD PTR [rax]
+  1107:       48 8b 05 ca 2e 00 00    mov    rax,QWORD PTR [rip+0x2eca]        #3fd8<tmp-0x50> 
+  110e:       89 10                   mov    DWORD PTR [rax],edx
+
+```
+
+
+这边看下tmp是如何关联的。
+`R_X86_64_GLOB_DAT` 说明需要动态链接器找到`tmp`的值填充到`0x3fd8`. 而函数则是`rip+0x2eca` 那么就是`110e+2eca=3fd8`
+
+
