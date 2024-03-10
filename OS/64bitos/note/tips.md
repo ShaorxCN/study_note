@@ -213,3 +213,11 @@ ENTRY(SYMBOL)：将符号 SYMBOL 的值设置为入口地址，入口地址是�
                     return 0;
                 }
         ```
+
+
+
+windows查看系统保留端口:
+
+```shell
+netsh int ipv4 show excludedportrange tcp
+```
