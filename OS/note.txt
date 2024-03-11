@@ -66,3 +66,13 @@ SBI supervisor binary interface   监督模式二进制接口
 异步性  系统调用和中断 会打断当前执行的指令顺序。
 共享性  感觉还是和虚拟化相关 共享资源 当然还是有限制的  读没啥问题 写写 或者读写 还是互斥的。实际读应该也是通过分时安排的？
 持久性  比如内存数据到硬盘的持久化
+
+
+debian 11 root密码重置。
+
+重启grub菜单按e进入编辑界面 在linux行末尾追加 rw init=/bin/bash 然后f10启动
+
+mount  | grep -w / 
+查看是否文件系统的权限。有的话直接passwd修改密码。此时已经是root用户登录了。
+
+然后exec /sbin/init 重启系统即可。
