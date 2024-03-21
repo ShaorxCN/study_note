@@ -3,6 +3,8 @@
 -  [1 基础知识](#c1)
     - [部分指令说明](#c1-1)
     - [部分概念说明](#c1-2)
+    - [linux安全机制](#c1-3)
+      - [Stack Canaries](#c1-3-1)
 
 
 
@@ -134,11 +136,15 @@ exit(0)                                 = ?
 一般我们使用用户空间实现的api而不是直接使用系统调用。比如我们用`printf()->c库的printf()->c库的write()->write系统调用`
 
 
-**Stack Canaries**
+
+
+<div id=c1-3><h2>linux安全机制</h2></div>
+
+<div id=c1-3-1><h3>Stack Canaries</h3></div>
 
 栈保护技术 防止缓冲区溢出攻击的安全机制。主要是将一个特殊的随机值插入到函数的栈帧中。在函数返回的时候 去检测这个值是否变化。
 
-主要是函数返回之前，一般在调用函数的时候 返回地址会压入被调用函数的栈。一般是最后压入的。这时候如果通过栈溢出的方式就可以修改函数返回的地址。canary就是保护这个的，他一般会在返回地址的后面(高地址) 也就是先于返回地址入栈，在局部变量空间的前面(低地址处)。也就是两者之间。这样如果通过栈溢出的方式覆盖返回地址必然会覆盖canary值。局部变量溢出的时候向下必然先覆盖canary值，这样通过检查canary值是否被篡改就可以判读是否发生了栈溢出攻击。如下图。这边局部变量是在prologue  函数序言部分入栈的。
+主要是函数返回之前，一般在调用函数的时候 返回地址会压入被调用函数的栈。一般是最后压入的。这时候如果通过栈溢出的方式就可以修改函数返回的地址。canary就是保护这个的，他一般会在返回地址的后面(高地址) 也就是先于返回地址入栈，在局部变量空间的前面(低地址处)。也就是两者之间。这样如果通过栈溢出的方式覆盖返回地址必然会覆盖canary值。局部变量溢出的时候向下必然先覆盖canary值，这样通过检查canary值是否被篡改就可以判读是否发生了栈溢出攻击。如下图。这边局部变量是在prologue  函数序言部分入栈的。这边可以参考OS/64bittos/
 
 ```
     高地址
@@ -247,3 +253,42 @@ typedef struct tcbhead_t {
 前提 fork子进程的canary和父进程一致
 
 还有就是之前学习汇编。rbp指针 base pointer.指向函数栈帧。可以用来访问当前函数栈帧中的局部变量和函数参数等。
+
+这边举个没有canary的例子，见代码[code/stack_canaries/at_no_canary.py 以及 no_stack_canary.c]
+
+```
+0000000000401145 <vulnerable>:
+  401145:       55                      push   %rbp
+  401146:       48 89 e5                mov    %rsp,%rbp
+  401149:       48 83 ec 10             sub    $0x10,%rsp
+  40114d:       48 8d 3d b9 0e 00 00    lea    0xeb9(%rip),%rdi        # 40200d <_IO_stdin_used+0xd>
+  401154:       e8 d7 fe ff ff          callq  401030 <puts@plt>
+  401159:       48 8d 45 f4             lea    -0xc(%rbp),%rax
+  40115d:       48 89 c7                mov    %rax,%rdi
+  401160:       b8 00 00 00 00          mov    $0x0,%eax
+  401165:       e8 d6 fe ff ff          callq  401040 <gets@plt>
+  40116a:       48 8d 45 f4             lea    -0xc(%rbp),%rax
+  40116e:       48 89 c7                mov    %rax,%rdi
+  401171:       e8 ba fe ff ff          callq  401030 <puts@plt>
+  401176:       90                      nop
+  401177:       c9                      leaveq
+  401178:       c3                      retq
+
+
+0000000000401132 <success>:
+  401132:       55                      push   %rbp
+  401133:       48 89 e5                mov    %rsp,%rbp
+  401136:       48 8d 3d c7 0e 00 00    lea    0xec7(%rip),%rdi        # 402004 <_IO_stdin_used+0x4>
+  40113d:       e8 ee fe ff ff          callq  401030 <puts@plt>
+  401142:       90                      nop
+  401143:       5d                      pop    %rbp
+  401144:       c3                      retq
+```
+
+这边是objdump -d出来发现success的地址在0x401132 然后s的基于rbp的偏移是0xc所以这边长度就是0xc加8byte的canary值，后面就是ret地址。
+
+结果如下:
+
+```
+b'AAAAAAAAAAAAAAAAAAAA2\x11@\nsuccess!\n'
+```
