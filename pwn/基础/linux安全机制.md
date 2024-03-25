@@ -267,22 +267,19 @@ typedef struct tcbhead_t {
 这边举个没有canary的例子，见代码[code/stack_canaries/at_no_canary.py 以及 no_stack_canary.c]
 
 ```
-0000000000401145 <vulnerable>:
-  401145:       55                      push   %rbp
+401145:       55                      push   %rbp
   401146:       48 89 e5                mov    %rsp,%rbp
   401149:       48 83 ec 10             sub    $0x10,%rsp
-  40114d:       48 8d 3d b9 0e 00 00    lea    0xeb9(%rip),%rdi        # 40200d <_IO_stdin_used+0xd>
-  401154:       e8 d7 fe ff ff          callq  401030 <puts@plt>
-  401159:       48 8d 45 f4             lea    -0xc(%rbp),%rax
-  40115d:       48 89 c7                mov    %rax,%rdi
-  401160:       b8 00 00 00 00          mov    $0x0,%eax
-  401165:       e8 d6 fe ff ff          callq  401040 <gets@plt>
-  40116a:       48 8d 45 f4             lea    -0xc(%rbp),%rax
-  40116e:       48 89 c7                mov    %rax,%rdi
-  401171:       e8 ba fe ff ff          callq  401030 <puts@plt>
-  401176:       90                      nop
-  401177:       c9                      leaveq
-  401178:       c3                      retq
+  40114d:       48 8d 45 f4             lea    -0xc(%rbp),%rax
+  401151:       48 89 c7                mov    %rax,%rdi
+  401154:       b8 00 00 00 00          mov    $0x0,%eax
+  401159:       e8 e2 fe ff ff          callq  401040 <gets@plt>
+  40115e:       48 8d 45 f4             lea    -0xc(%rbp),%rax
+  401162:       48 89 c7                mov    %rax,%rdi
+  401165:       e8 c6 fe ff ff          callq  401030 <puts@plt>
+  40116a:       90                      nop
+  40116b:       c9                      leaveq
+  40116c:       c3                      retq
 
 
 0000000000401132 <success>:
@@ -295,7 +292,19 @@ typedef struct tcbhead_t {
   401144:       c3                      retq
 ```
 
-这边是objdump -d出来发现success的地址在0x401132 然后s的基于rbp的偏移是0xc所以这边长度就是0xc加8byte的canary值，后面就是ret地址。
+这边是objdump -d出来发现success的地址在0x401132 然后s的基于rbp的偏移是0xc所以这边长度就是0xc加8byte的rbp值，后面就是ret地址。
+
+这里简单说明下:
+
+```
+  401145:       55                      push   %rbp
+  401146:       48 89 e5                mov    %rsp,%rbp
+  401149:       48 83 ec 10             sub    $0x10,%rsp
+```
+
+第一步push old rbp 然后将当前rsp赋值给rbp所以old rbp位于当前rbp上方(栈的高地址处)然后分配局部变量空间。
+
+所有构建出了基于0xc到达rbp处还需要再加上old rbp的8byte
 
 结果如下:
 
