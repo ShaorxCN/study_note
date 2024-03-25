@@ -5,6 +5,8 @@
     - [部分概念说明](#c1-2)
     - [linux安全机制](#c1-3)
       - [Stack Canaries](#c1-3-1)
+      - [No-eXecute](#c1-3-2)
+
 
 
 
@@ -292,3 +294,37 @@ typedef struct tcbhead_t {
 ```
 b'AAAAAAAAAAAAAAAAAAAA2\x11@\nsuccess!\n'
 ```
+
+
+<div id=c1-3-2><h3>No eXecute</h3></div>
+
+这是将内存页属性设置为不可知性从而阻止攻击。这边bit位可以参见`OS/blog_os/blog_os_cn/paging-introduction.md`。部分攻击会通过栈溢出的方式将恶意代码植入。这时候如果pc指向这些nx，会触发硬件层面的异常。需要硬件以及软件方面的支持。需要支持分页系统。然后`GOT`部分见`source2elf.md`这边代码一般.text才是可执行的。那么这些溢出方式攻击`GOT`的方式一般无效。但是代码重用来进行攻击 ret2libc 还是可用。因为本身`nx`bit是0.比如将代码返回地址变为libc的system函数然后传递参数设置为某条shell指令。这时候nx保护机制就无效了。
+
+gcc -z是针对运行时栈的设置。
+
+
+1. -z execstack: 这个选项告诉链接器生成的可执行文件或共享对象的栈是可执行栈。也就是说，栈空间可以包含可执行代码。
+2. -z noexecstack: 这个选项与 -z execstack 相反，它使得生成的对象的栈空间不可执行，这是一个常用的安全特性，可以防止一些缓冲区溢出的攻击。
+3. -z relro: 这个选项让链接器把进程启动后，不会再被修改的部分进行标记。启动这个选项有助于防止某些类型的缓冲区溢出攻击。
+4. -z now: 当打开了这个选项，动态链接器会在程序启动时解析所有的动态符号，这样可以避免潜在的运行时解析的问题。
+4. -z lazy: 这个选项与 -z now 相反，动态链接器会在程序运行过程中，延迟解析动态符号，直到这些符号被用到。
+
+
+默认是rw不可知性。`readelf -l`可以看到。
+
+
+下面是一个攻击示例,代码见`nx/code/dep.c`
+
+`\x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80`
+
+下面是对这个 shellcode 的简单解释：
+
+- \x31\xc9：xorl %ecx,%ecx；将 ecx 寄存器清零。
+- \xf7\xe1：pushl %ecx；将清零后的 ecx 寄存器的值压入栈中。
+- \xb0\x0b：movb $0xb,%al；将值 0xb 赋给 al 寄存器，这是系统调用号，对应于 Linux 的 execve 系统调用。
+- \x51：pushl %ecx；再次将 ecx 寄存器的值（0）压入栈中，作为 execve 的 argv 指针。
+- \x68\x2f\x2f\x73\x68：pushl $0x68732f2f；将字符串 "//sh" 的反序形式压入栈中，作为 execve 的参数之一。
+- \x68\x2f\x62\x69\x6e：pushl $0x6e69622f；将字符串 "/bin" 的反序形式压入栈中，与前面的 "//sh" 组合成 "/bin//sh"。
+- \x89\xe3：movl %esp,%ebx；将栈指针 esp 的值赋给 ebx 寄存器，此时 ebx 指向刚才压入的 "/bin//sh" 字符串。
+- \xcd\x80：int $0x80；触发中断 0x80，执行 Linux 系统调用。
+当这个 shellcode 被插入到程序的某个缓冲区，并由于缓冲区溢出而被执行时，它会尝试启动一个新的 shell。
