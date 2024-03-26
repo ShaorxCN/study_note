@@ -2,7 +2,7 @@
 
 void vuln_func()
 {
-    char buf[12];
+    char buf[100];
     read(STDIN_FILENO,buf,256);
 }
 

