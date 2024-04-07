@@ -6,6 +6,7 @@
     - [linux安全机制](#c1-3)
       - [Stack Canaries](#c1-3-1)
       - [No-eXecute](#c1-3-2)
+      - [ASLR和PIE](#c1-3-3)
 
 
 
@@ -152,26 +153,26 @@ exit(0)                                 = ?
 +-------------------+
 |                   | <-- High Memory Address
 |       ...         |
-|                   |
-|-------------------| 
-|       argn        |  
-|-------------------|
-|       ...         |
-|                   |
-|-------------------|
-|       arg1        |
-|-------------------|
-|   return addr     |
-|-------------------|
-|  stack canary     |
-|-------------------| <-- 调用者栈帧底部 (rbp) 被调用者顶部
-|     old rbp       |  
-|-------------------|
-|    local var      |
-|-------------------|
-|       ...         |
-|                   |
-|-------------------| <-- Low Memory Address rsp
+|                     |
+| ------------------- |
+| argn                |
+| ------------------- |
+| ...                 |
+|                     |
+| ------------------- |
+| arg1                |
+| ------------------- |
+| return addr         |
+| ------------------- |
+| stack canary        |
+| ------------------- |
+| old rbp             |
+| ------------------- | <-- 调用者栈帧底部 (rbp) 被调用者顶部 |
+| local var           |
+| ------------------- |
+| ...                 |
+|                     |
+| ------------------- | <-- Low Memory Address rsp            |
 
 
 
@@ -353,14 +354,78 @@ gcc -z是针对运行时栈的设置。
 - \xcd\x80：int $0x80；触发中断 0x80，执行 Linux 系统调用。
 当这个 shellcode 被插入到程序的某个缓冲区，并由于缓冲区溢出而被执行时，它会尝试启动一个新的 shell。
 
-`\x48\xc7\xc0\x3b\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x53\x48\x89\xe7\x50\x57\x57\x48\x89\xe6\x0f\x05`
+`\x48\x31\xff\x57\x48\xbf\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x57\x48\x89\xe7\x48\x31\xf6\x56\x48\x89\xe2\x56\xb0\x3b\x48\x89\xe6\x0f\x05`
 
-\x48\xc7\xc0\x3b ; xorq %r8, %r8 ; 将r8寄存器清零  
-\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68 ; movabsq $0x68732f6e69622f2f, %r11 ; 将"/bin//sh"的地址放入r11寄存器  
-\x53 ; pushq %r11 ; 将r11压入栈（此时栈顶为字符串地址）  
-\x48\x89\xe7 ; movq %rsp, %r15 ; 将栈指针rsp的值赋给r15寄存器  
-\x50 ; pushq %r8 ; 将清零的r8压入栈（此时作为NULL参数）  
-\x57 ; pushq %r15 ; 将r15（字符串地址）压入栈  
-\x57 ; pushq %r15 ; 再次压入字符串地址，形成正确的execve参数列表  
-\x48\x89\xe6 ; movq %rsp, %rsi ; 将栈指针rsp的值赋给rsi寄存器（execve的第二个参数）  
-\x0f\x05 ; syscall ; 触发系统调用
+```assembly
+    ; 设置 rdi 为字符串 "/bin/sh" 的地址
+    xor rdi, rdi
+    push rdi
+    mov rdi, 0x68732f6e69622f2f  ; "/bin/sh" 的 ASCII 码
+    push rdi
+
+    ; 设置 rsi 和 rdx 为 NULL
+    xor rsi, rsi
+    push rsi
+    mov rdx, rsi
+    push rdx
+
+    ; 调用 execve 系统调用
+    mov al, 0x3b  ; execve 的系统调用号
+    mov rsi, rsp  ; 参数 argv 数组的地址
+    syscall
+```
+
+
+<div id=c1-3-3><h3>ASLR和PIE</h3></div>
+
+基于上面的几个机制 发现问题都是出现在地址固定。然后根据反编译或者运行时溢栈推算出部分攻击地址。ASLR(address space layout randomization)就说地址空间布局随机化。这时候运行的时候随机化地址。从概率上减少攻击成功的可能性。但是在类似fork的时候 其会沿用父进程的内存布局空间。 配置是`/proc/sys/kernel/randomize_va_space`. `0`是不开启 `1`是部分开启 仅仅支持栈的以及共享库vdso的随机化 `2`则是完全开启 增加堆的随机化。但是ASLR仍旧是有漏洞的 其可执行代码等地址无法随机化 且需要操作系统层面配置支持。仍旧可以通过类似`ret2plt` `GOT劫持` （修改GOT表来实现指定跳转 PLT也是类似  共享库以及GOT的第一次赋值也是PLT实现的）以及地址爆破(比如子进程是沿用父进程的，虽然父进程检测到攻击会崩溃 下次仍旧会随机 但是通过攻击子进程可以规避父进程崩溃的防线)
+
+PIE(position-independent-executable)则是作为ASLR的补充支持，其在编译步骤实现了随机性。使生成的代码位置无关可以被加载到任一地址段。只有在程序运行的时候动态链接器来确保实际正确的地址。其中会依赖GOT表的内容，动态链接器通过GOT表中的内容来替换重定位表中的地址。确保正常的调用。
+
+tip 这里说明下callee的操作 以dep.c中的vuln_func为例
+
+```
+0000000000401132 <vuln_func>:
+  401132:       55                      push   %rbp
+  401133:       48 89 e5                mov    %rsp,%rbp
+  401136:       48 83 ec 70             sub    $0x70,%rsp
+  40113a:       48 8d 45 90             lea    -0x70(%rbp),%rax
+  40113e:       ba 00 01 00 00          mov    $0x100,%edx
+  401143:       48 89 c6                mov    %rax,%rsi
+  401146:       bf 00 00 00 00          mov    $0x0,%edi
+  40114b:       e8 f0 fe ff ff          callq  401040 <read@plt>
+  401150:       90                      nop
+  401151:       c9                      leaveq
+  401152:       c3                      retq
+```
+
+
+这里是从main进来的 先push rbp 保存main的rbp 然后将当前rsp值给rbp 构建vuln_func的栈帧 然后rsp-0x70开辟callee也就是vuln_func的局部空间 然后后面几个实际是为调用read 准备参数。因为这边是x86-64 前面的6个参数是通过rdi rsi rdx rcx r8 r9传递的。这里lea获取的是buf地址 然后参数右到左开始准备 显示0x100对应read的第三个参数 读取256个字节 然后是中间的buf本身 就是通过rax传递 然后是filehandle 这里是0 也就是stdin.返回值同样是通过rax传递
+
+接下来就是callq read 这里相当于做了两件事情 显示push 401150 就是将下一条指令入栈 然后jmp read。
+
+
+下面是32bit的结果
+
+```
+08049172 <vuln_func>:
+ 8049172:       55                      push   %ebp
+ 8049173:       89 e5                   mov    %esp,%ebp
+ 8049175:       53                      push   %ebx
+ 8049176:       83 ec 74                sub    $0x74,%esp
+ 8049179:       e8 67 00 00 00          call   80491e5 <__x86.get_pc_thunk.ax>
+ 804917e:       05 82 2e 00 00          add    $0x2e82,%eax
+ 8049183:       83 ec 04                sub    $0x4,%esp
+ 8049186:       68 00 01 00 00          push   $0x100
+ 804918b:       8d 55 94                lea    -0x6c(%ebp),%edx
+ 804918e:       52                      push   %edx
+ 804918f:       6a 00                   push   $0x0
+ 8049191:       89 c3                   mov    %eax,%ebx
+ 8049193:       e8 98 fe ff ff          call   8049030 <read@plt>
+ 8049198:       83 c4 10                add    $0x10,%esp
+ 804919b:       90                      nop
+ 804919c:       8b 5d fc                mov    -0x4(%ebp),%ebx
+ 804919f:       c9                      leave
+ 80491a0:       c3                      ret
+```
+这里开头类似 但是多了个push ebx是因为后面需要修改ebx先保存。然后开辟局部空间。中间跳过 从push 0x100开始就是通过栈传递参数。然后返回值是通过eax传递的 所以备份eax到ebx 开头则是将ebx备份到栈上？
