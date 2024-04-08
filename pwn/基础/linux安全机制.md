@@ -7,6 +7,8 @@
       - [Stack Canaries](#c1-3-1)
       - [No-eXecute](#c1-3-2)
       - [ASLR和PIE](#c1-3-3)
+      - [FORTIFY_SOURCE和RELRO](#c1-3-4)
+
 
 
 
@@ -428,4 +430,126 @@ tip 这里说明下callee的操作 以dep.c中的vuln_func为例
  804919f:       c9                      leave
  80491a0:       c3                      ret
 ```
-这里开头类似 但是多了个push ebx是因为后面需要修改ebx先保存。然后开辟局部空间。中间是寻找pc指针先跳过 从push 0x100开始就是通过栈传递参数。然后返回值是通过eax传递的 所以备份eax到ebx 开头则是将ebx备份到栈上？
+这里开头类似 但是多了个push ebx是因为后面需要修改ebx先保存。然后开辟局部空间。中间的`__x86.get_pc_thunk.ax>` 是将下一条指令的地址赋值给eax 紧接着add一个偏移获取GOT的地址。并以此为基地址操作。 从push 0x100开始就是通过栈传递参数。然后返回值是通过eax传递的 所以备份eax到ebx 开头则是将ebx备份到栈上？
+
+
+`gef> disassemble /r main`
+
+```
+...
+0x565561e7 <+15>:    e8 c4 fe ff ff  call   0x565560b0 <__x86.get_pc_thunk.bx>
+0x565561ec <+20>:    81 c3 14 2e 00 00       add    ebx,0x2e14
+0x565561f2 <+26>:    e8 b2 ff ff ff  call   0x565561a9 <vuln_func>
+0x565561f7 <+31>:    83 ec 04        sub    esp,0x4
+0x565561fa <+34>:    6a 0d   push   0xd
+0x565561fc <+36>:    8d 83 08 e0 ff ff       lea    eax,[ebx-0x1ff8]
+0x56556202 <+42>:    50      push   eax
+0x56556203 <+43>:    6a 01   push   0x1
+...
+```
+
+此处可以计算出got表的位置
+`gef➤  x/8wx 0x565561ec+0x2e14`
+
+```
+0x56559000:     0x00003efc      0xf7ffd980      0xf7fe88e0      0x56556036
+0x56559010 <__libc_start_main@got.plt>: 0xf7de3d40      0x56556056      0x00000000      0x5655901c
+```
+
+然后是read@got
+
+
+`gef➤  x/8wx 0x565561ec+0x2e14+0xc`
+
+```
+0x5655900c <read@got.plt>:      0x56556036      0xf7de3d40      0x56556056      0x00000000
+0x5655901c:     0x5655901c      0x00000000      0x00000000      0x00000000
+```
+
+查看read
+
+```
+gef➤  x/7i 0x56556036
+   0x56556036 <read@plt+6>:     push   0x0
+   0x5655603b <read@plt+11>:    jmp    0x56556020
+   0x56556040 <__libc_start_main@plt>:  jmp    DWORD PTR [ebx+0x10]
+   0x56556046 <__libc_start_main@plt+6>:        push   0x8
+   0x5655604b <__libc_start_main@plt+11>:       jmp    0x56556020
+   0x56556050 <write@plt>:      jmp    DWORD P
+```
+
+当然也可以直接看下:
+
+```
+gef➤  got
+
+GOT protection: Partial RelRO | GOT functions: 3
+ 
+[0x5655900c] read@GLIBC_2.0  →  0x56556036
+[0x56559010] __libc_start_main@GLIBC_2.0  →  0xf7de3d40
+[0x56559014] write@GLIBC_2.0  →  0x56556056
+```
+
+read的`0x56556036`和上面结果一致 然后got的开始位置`0x56559000`也是一致(前面几个表项固定未展示 3x4 byte = c)
+
+
+<div id=c1-3-4><h3>FORTIFY_SOURCE和RELRO</h3></div>
+
+fortify_source 主要是检查字符串读取是否可知 格式化是否正确 比如读取大小是否可知 可知的情况是否小雨缓冲区等等。
+
+RELRO(relocation read only)针对延迟绑定这些情况下 因为got.plt是解析后修改的 所以需要将其设置为可写。这就是可以攻击的地方。
+RELRO分为两种 一种是默认的 就是将部分设置为不可写 例如got dynamic等。一种是full 就是在程序初始化的时候将所有的解析工作完成 并且设置为不可写。性能会有损失 但是这样减少攻击的可能性。
+
+
+首先关闭relro 
+
+```
+objdump -R ../target/norelro 
+
+../target/norelro:     file format elf64-x86-64
+
+
+DYNAMIC RELOCATION RECORDS
+OFFSET           TYPE              VALUE 
+0000000000403330 R_X86_64_GLOB_DAT  __libc_start_main@GLIBC_2.2.5
+0000000000403338 R_X86_64_GLOB_DAT  __gmon_start__
+0000000000403358 R_X86_64_JUMP_SLOT  printf@GLIBC_2.2.5
+0000000000403360 R_X86_64_JUMP_SLOT  strtol@GLIBC_2.2.5
+```
+
+```
+[21] .got              PROGBITS         0000000000403330  00002330
+       0000000000000010  0000000000000008  WA       0     0     8
+[22] .got.plt          PROGBITS         0000000000403340  00002340
+       0000000000000028  0000000000000008  WA       0     0     8
+```
+
+`R_X86_64_JUMP_SLOT` 用于延迟绑定  这里就是两个库函数。 然后`R_X86_64_GLOB_DAT`用于将符号地址写到offset 也就是got表中。ld遇到这个类型的时候会找出那个elf文件包含这个 然后基于base_addr等计算出实际地址写到offset处 也就是got段。这里可以看到got段地址匹配
+
+这样`../target/norelro  0000000000403330` 修改成功
+
+在开启lazy 也就是Partial模式下 got被保护 运行现实段错误 但是got.plt还是可以修改
+
+这是因为程序头中多了个段 包含了.got并且只读 见下文
+
+
+```
+ype           Offset             VirtAddr           PhysAddr
+                 FileSiz            MemSiz              Flags  Align
+ GNU_RELRO      0x0000000000002e10 0x0000000000403e10 0x0000000000403e10
+                 0x00000000000001f0 0x00000000000001f0  R      0x1
+
+```
+
+```
+[21] .got              PROGBITS         0000000000403ff0  00002ff0
+       0000000000000010  0000000000000008  WA       0     0     8
+[22] .got.plt          PROGBITS         0000000000404000  00003000
+       0000000000000028  0000000000000008  WA       0     0     8
+```
+
+这边`0x0000000000403e10+0x00000000000001f0=0x404000`直接包含了dynamic和got 但是不包含got.plt
+
+完全开启则直接所有都归类到.got 没有got.plt然后修改失败 段错误
+
+

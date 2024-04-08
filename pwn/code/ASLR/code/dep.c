@@ -2,7 +2,7 @@
 
 
 // gcc -m32 -fno-stack-protector -z noexecstack -no-pie dep.c -o ../target/nopie.out
-// gcc -m32 -fno-stack-protector -z noexecstack -pie dep.c -o ../target/pie.out
+// gcc -m32 -fno-stack-protector -z noexecstack -pie -fpie dep.c -o ../target/pie.out
 void vuln_func()
 {
     char buf[100];
