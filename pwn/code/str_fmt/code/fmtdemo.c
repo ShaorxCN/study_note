@@ -1,4 +1,5 @@
 // gcc -m32 -fno-stack-protector -no-pie fmtdemo.c -o ../target/fmtdemo -g
+// gcc -fno-stack-protector -no-pie fmtdemo.c -o ../target/fmtdemo64 -g
 
 #include <stdio.h>
 
