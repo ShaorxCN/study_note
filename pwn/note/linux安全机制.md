@@ -195,7 +195,7 @@ sub rsp,<局部变量空间大小等>
 
 这里可以理解rsp一直在操作，但是通过rbp来锁定函数栈帧，比如这边push rbp 就是保存caller的函数栈帧之后mov rbp,rsp就是指定了callee的栈帧。然后再在rsp的基础上为callee分配局部变量空间。返回的时候再通过 mov rsp,rbp逻辑释放callee的函数栈帧。 pop rbp ,回复caller的rbp 然后ret.
 
-
+(补充 实际发现程序中canary跟在buf后面)
 
 Canaries 分为三类
 
@@ -488,7 +488,7 @@ read的`0x56556036`和上面结果一致 然后got的开始位置`0x56559000`也
 
 <div id=c1-3-4><h3>FORTIFY_SOURCE和RELRO</h3></div>
 
-fortify_source 主要是检查字符串读取是否可知 格式化是否正确 比如读取大小是否可知 可知的情况是否小雨缓冲区等等。
+fortify_source 主要是检查字符串读取是否可知 格式化是否正确 比如读取大小是否可知 可知的情况是否小于缓冲区等等。
 
 RELRO(relocation read only)针对延迟绑定这些情况下 因为got.plt是解析后修改的 所以需要将其设置为可写。这就是可以攻击的地方。
 RELRO分为两种 一种是默认的 就是将部分设置为不可写 例如got dynamic等。一种是full 就是在程序初始化的时候将所有的解析工作完成 并且设置为不可写。性能会有损失 但是这样减少攻击的可能性。
@@ -556,7 +556,7 @@ ype           Offset             VirtAddr           PhysAddr
   sub esp,xx
   ...
   mov esp,ebp
-  push ebp
+  pop ebp
   ret
 ```
 
