@@ -108,6 +108,7 @@ gef➤  telescope $esp -l 24
 gef➤  p 0xffffd09c-0xffffd090
 $3 = 0xc
 ```
+这里得出args 15是canary 
 
 这边计算args `0xffffd08c-0xffffd054`  在除以4那就是15 那么就通过%15$x获取canary
 
@@ -129,5 +130,3 @@ $3 = 0xc
 $ ls
 answer.md  binary_200  pwn200.c  pwn200.py  txt  txt_200
 ```
-
-
