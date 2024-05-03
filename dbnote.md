@@ -313,3 +313,22 @@ select user();//查询当前用户名
 show tables; 展示该库的所有表
 
 desc tableName/show columns from tableName;展示表的字段结构
+
+
+docker run -d -p 5432:5432 --name postgresql  -v hostdb_data:/var/lib/postgresql/data\ -e POSTGRES_PASSWORD=xxxx postgres
+
+
+docker run -d -p 5433:80 --name pgadmin4 -e PGADMIN_DEFAULT_EMAIL=test@1234.com -e PGADMIN_DEFAULT_PASSWORD=xxxx dpage/pgadmin4
+
+
+
+create database xxx;
+
+CREATE USER aaaaa WITH ENCRYPTED PASSWORD 'xxxxx'
+GRANT ALL PRIVILEGES ON DATABASE xxx TO aaaa;
+
+
+CREATE TABLE  if not exists test_table (
+    user_id SERIAL PRIMARY KEY, -- SERIAL 类型会自动创建自增的唯一标识
+    name VARCHAR(256) UNIQUE
+);
