@@ -332,3 +332,8 @@ CREATE TABLE  if not exists test_table (
     user_id SERIAL PRIMARY KEY, -- SERIAL 类型会自动创建自增的唯一标识
     name VARCHAR(256) UNIQUE
 );
+
+
+
+// windows下
+docker run -itd --name redis  --log-opt max-size=100m --log-opt max-file=2 -p 6379:6379 -v D:\\redis\\redis.conf:/etc/redis/redis.conf -v D:\\redis\\data:/data -v D:\\redis\\log:/var/log/redis redis redis-server /etc/redis/redis.conf 
