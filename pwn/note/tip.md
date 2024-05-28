@@ -1,3 +1,13 @@
+# tip
+
+-  [1 函数调用栈结构](#c1)
+-  [2 32bit覆盖返回system("/bin/sh")说明](#c2)
+
+
+
+<div id=c1><h2>函数调用栈结构</h2></div>
+
+
 call xxxx ；默认动作会将下条指令地址铺设
 
 leave 会达成类似下面语句的效果
@@ -190,26 +200,62 @@ Dump of assembler code for function main:
    0x000000000000118d <+52>:    leave  
    0x000000000000118e <+53>:    ret    
 End of assembler dump.
+```
+
+这边没有特别的 就是参数传递有变动
+
+
+```asm
 gef➤  disassemble func
 Dump of assembler code for function func:
    0x0000000000001125 <+0>:     push   rbp
-   0x0000000000001126 <+1>:     mov    rbp,rsp
-   0x0000000000001129 <+4>:     mov    DWORD PTR [rbp-0x14],edi
+   0x0000000000001126 <+1>:     mov    rbp,rsp                               # 还是保存callers rbp 并且设置callees rbp 
+   0x0000000000001129 <+4>:     mov    DWORD PTR [rbp-0x14],edi              #  下面都是讲寄存器中的参数转存到栈上
    0x000000000000112c <+7>:     mov    DWORD PTR [rbp-0x18],esi
    0x000000000000112f <+10>:    mov    DWORD PTR [rbp-0x1c],edx
    0x0000000000001132 <+13>:    mov    DWORD PTR [rbp-0x20],ecx
    0x0000000000001135 <+16>:    mov    DWORD PTR [rbp-0x24],r8d
    0x0000000000001139 <+20>:    mov    DWORD PTR [rbp-0x28],r9d
-   0x000000000000113d <+24>:    mov    eax,DWORD PTR [rbp-0x14]
-   0x0000000000001140 <+27>:    add    eax,0x1
-   0x0000000000001143 <+30>:    mov    DWORD PTR [rbp-0x4],eax
-   0x0000000000001146 <+33>:    mov    eax,DWORD PTR [rbp+0x18]
-   0x0000000000001149 <+36>:    add    eax,0x8
-   0x000000000000114c <+39>:    mov    DWORD PTR [rbp-0x8],eax
+   0x000000000000113d <+24>:    mov    eax,DWORD PTR [rbp-0x14]              # arg1保存到eax 
+   0x0000000000001140 <+27>:    add    eax,0x1                               # arg1+1
+   0x0000000000001143 <+30>:    mov    DWORD PTR [rbp-0x4],eax               # 结果保存到loc1  此处可见保存的是32bit int?
+   0x0000000000001146 <+33>:    mov    eax,DWORD PTR [rbp+0x18]              # 这边最后两个参数是在栈上 向上有个rbp有个retaddress还有个arg7 那就是8+8+8=0x18 rbp上方0x18 arg8
+   0x0000000000001149 <+36>:    add    eax,0x8                               # arg8+8
+   0x000000000000114c <+39>:    mov    DWORD PTR [rbp-0x8],eax               # 结果给loc2 
    0x000000000000114f <+42>:    mov    edx,DWORD PTR [rbp-0x4]
    0x0000000000001152 <+45>:    mov    eax,DWORD PTR [rbp-0x8]
    0x0000000000001155 <+48>:    add    eax,edx
-   0x0000000000001157 <+50>:    pop    rbp
+   0x0000000000001157 <+50>:    pop    rbp                                   # 这边没有动rsp所有不用leave 平衡栈 直接pop rbp 
    0x0000000000001158 <+51>:    ret 
-
 ```
+
+这里有一处特别的 那就是没有开辟空间给loc1 loc2 这边是编译器优化  amd64 abi中说明rsp下128B作为red zone 不会被信号或者中断修改。所以可以直接使用 不需要额外开辟。下面也可以看到直接使用了rbp下方的区域 将寄存器中的参数转存进来。不过不是惯例的右到左了。其他见上文注释
+
+
+<div id=c2><h2>32bit覆盖返回system("/bin/sh")说明</h2></div>
+
+然后有个之前覆盖ret为system在padding4字节后填充`/bin/sh`的原因
+
+
+```asm
+gef➤  disassemble system
+Dump of assembler code for function __libc_system:
+   0xf7e09060 <+0>:     call   0xf7f04e9d <__x86.get_pc_thunk.dx>
+   0xf7e09065 <+5>:     add    edx,0x1a2f9b
+   0xf7e0906b <+11>:    sub    esp,0xc
+   0xf7e0906e <+14>:    mov    eax,DWORD PTR [esp+0x10]
+   0xf7e09072 <+18>:    test   eax,eax
+   0xf7e09074 <+20>:    je     0xf7e09080 <__libc_system+32>
+   0xf7e09076 <+22>:    add    esp,0xc
+   0xf7e09079 <+25>:    jmp    0xf7e08ad0 <do_system>
+   0xf7e0907e <+30>:    xchg   ax,ax
+   0xf7e09080 <+32>:    lea    eax,[edx-0x5ccc0]
+   0xf7e09086 <+38>:    call   0xf7e08ad0 <do_system>
+   0xf7e0908b <+43>:    test   eax,eax
+   0xf7e0908d <+45>:    sete   al
+   0xf7e09090 <+48>:    add    esp,0xc
+   0xf7e09093 <+51>:    movzx  eax,al
+   0xf7e09096 <+54>:    ret 
+```
+
+这里可以看到先sub esp,0xc 然后再装在esp+0x10 也就是实际esp+0x4的位置作为do_system的参数。所以在覆盖retaddress后还需要padding一个4B(实际是call system的地方push了另外一个retaddress)
