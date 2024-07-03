@@ -1,0 +1,1 @@
+-E2EE: https://en.wikipedia.org/wiki/End-to-end_encryption
